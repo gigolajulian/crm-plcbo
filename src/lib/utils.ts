@@ -1,4 +1,4 @@
-import { BRAND } from './brand'
+import { activeCurrency, activeLocale } from './intl'
 
 /** Join class names, dropping falsy values. */
 export function cn(...parts: Array<string | false | null | undefined>): string {
@@ -38,22 +38,22 @@ export function seededRandom(seed: string): () => number {
 
 export function formatCurrency(value: number, opts: { compact?: boolean } = {}): string {
   if (opts.compact && Math.abs(value) >= 1000) {
-    return new Intl.NumberFormat(BRAND.locale, {
+    return new Intl.NumberFormat(activeLocale(), {
       style: 'currency',
-      currency: BRAND.currency,
+      currency: activeCurrency(),
       notation: 'compact',
       maximumFractionDigits: Math.abs(value) >= 100000 ? 0 : 1,
     }).format(value)
   }
-  return new Intl.NumberFormat(BRAND.locale, {
+  return new Intl.NumberFormat(activeLocale(), {
     style: 'currency',
-    currency: BRAND.currency,
+    currency: activeCurrency(),
     maximumFractionDigits: 0,
   }).format(value)
 }
 
 export function formatNumber(value: number, compact = false): string {
-  return new Intl.NumberFormat(BRAND.locale, {
+  return new Intl.NumberFormat(activeLocale(), {
     notation: compact ? 'compact' : 'standard',
     maximumFractionDigits: 1,
   }).format(value)
@@ -128,15 +128,15 @@ export function formatDate(
         : style === 'day'
           ? { weekday: 'short', month: 'short', day: 'numeric' }
           : { month: 'short', day: 'numeric', year: 'numeric' }
-  return new Intl.DateTimeFormat(BRAND.locale, opts).format(date)
+  return new Intl.DateTimeFormat(activeLocale(), opts).format(date)
 }
 
 export function formatMonth(value: string): string {
-  return new Intl.DateTimeFormat(BRAND.locale, { month: 'short' }).format(parseDate(value))
+  return new Intl.DateTimeFormat(activeLocale(), { month: 'short' }).format(parseDate(value))
 }
 
 export function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(BRAND.locale, {
+  return new Intl.DateTimeFormat(activeLocale(), {
     hour: 'numeric',
     minute: '2-digit',
   }).format(parseDate(value))

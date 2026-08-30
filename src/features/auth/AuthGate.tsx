@@ -1,27 +1,29 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { AlertTriangle, Cloud, HardDrive } from 'lucide-react'
+import { AlertTriangle, Check, Cloud, HardDrive, Loader2 } from 'lucide-react'
 import { BRAND } from '@/lib/brand'
 import { isRemote, requireSupabase } from '@/lib/supabase'
 import { useStore } from '@/store/useStore'
-import { hydrate, pushAll, startSync, stopSync } from '@/store/sync'
+import { hydrate, pushAll, startSync, stopSync, type PushProgress } from '@/store/sync'
 import { createSeedDatabase, createEmptyDatabase } from '@/data/seed'
-import { Button, Card, Pill, Skeleton } from '@/components/ui/primitives'
+import { Button, Card, Meter, Pill, Skeleton } from '@/components/ui/primitives'
 import { Input } from '@/components/ui/form'
 import { Logo } from '@/components/shell/Logo'
-import { toast } from '@/components/ui/feedback'
+import { Onboarding, type SetupResult } from '@/features/onboarding/Onboarding'
 import { cn } from '@/lib/utils'
 
 /* ============================================================================
    AUTH GATE
 
-   In local mode this is a pass-through — the app behaves exactly as before and
-   works offline. With Supabase configured it takes over: sign in, resolve the
-   user's workspace, hydrate the store from Postgres, and start mirroring
-   changes back.
+   Local mode is a pass-through. With Supabase configured this owns the whole
+   pre-app sequence:
+
+     signed out -> sign in
+     no workspace yet -> setup, then provision with visible progress
+     workspace exists -> hydrate, start syncing, hand over to the app
    ========================================================================== */
 
-type Phase = 'checking' | 'signed-out' | 'loading' | 'ready' | 'error'
+type Phase = 'checking' | 'signed-out' | 'resolving' | 'setup' | 'provisioning' | 'ready' | 'error'
 
 export function AuthGate({ children }: { children: ReactNode }) {
   if (!isRemote) return <>{children}</>
@@ -30,15 +32,23 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 function RemoteGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>('checking')
-  const [error, setError] = useState<string>('')
+  const [error, setError] = useState('')
   const [session, setSession] = useState<Session | null>(null)
+  const [progress, setProgress] = useState<PushProgress | null>(null)
+  const [stepLabel, setStepLabel] = useState('Creating your workspace')
+
+  const applySetup = useStore((s) => s.applySetup)
+  const completeSetup = useStore((s) => s.completeSetup)
+  const updateSettings = useStore((s) => s.updateSettings)
+
+  /* ------------------------------------------------------------- session */
 
   useEffect(() => {
     const supabase = requireSupabase()
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      setPhase(data.session ? 'loading' : 'signed-out')
+      setPhase(data.session ? 'resolving' : 'signed-out')
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
@@ -47,34 +57,40 @@ function RemoteGate({ children }: { children: ReactNode }) {
         stopSync()
         setPhase('signed-out')
       } else {
-        setPhase('loading')
+        setPhase((current) =>
+          current === 'setup' || current === 'provisioning' ? current : 'resolving',
+        )
       }
     })
 
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  /* Once signed in: find or create the workspace, then hydrate and sync. */
+  /* ------------------------------------------- does a workspace exist yet */
+
   useEffect(() => {
-    if (phase !== 'loading' || !session) return
+    if (phase !== 'resolving' || !session) return
     let cancelled = false
 
     ;(async () => {
       try {
-        const workspaceId = await resolveWorkspace(session)
-        if (cancelled) return
-        const hadData = await hydrate(workspaceId)
+        const existing = await findWorkspace()
         if (cancelled) return
 
-        // A brand-new workspace starts from whatever the local store holds —
-        // the demo studio, or the empty one chosen during setup.
-        if (!hadData) await pushAll(workspaceId)
+        // First sign-in: ask for everything the CRM needs before creating anything.
+        if (!existing) {
+          setPhase('setup')
+          return
+        }
 
-        startSync(workspaceId)
+        setStepLabel('Opening your studio')
+        await hydrate(existing)
+        if (cancelled) return
+        startSync(existing)
         setPhase('ready')
       } catch (caught) {
         if (cancelled) return
-        setError(caught instanceof Error ? caught.message : String(caught))
+        setError(describe(caught))
         setPhase('error')
       }
     })()
@@ -84,58 +100,129 @@ function RemoteGate({ children }: { children: ReactNode }) {
     }
   }, [phase, session])
 
+  /* ------------------------------------------------------- provisioning */
+
+  const provision = useCallback(
+    async (result: SetupResult) => {
+      if (!session) return
+      setPhase('provisioning')
+      setProgress(null)
+
+      try {
+        // 1. Apply the answers locally first, so what gets pushed is already
+        //    the studio they asked for rather than the defaults.
+        setStepLabel('Setting up your studio')
+        updateSettings({ theme: result.theme })
+        completeSetup(
+          {
+            name: result.name,
+            tagline: result.tagline,
+            ownerName: result.ownerName,
+            ownerRole: result.ownerRole,
+            ownerEmail: result.ownerEmail,
+            accent: result.accent,
+            currency: result.currency,
+            locale: result.locale,
+          },
+          result.start,
+        )
+        applySetup(result)
+        await tick()
+
+        // 2. Create the workspace row and the owner's membership, atomically.
+        setStepLabel('Creating your workspace')
+        const workspaceId = await createWorkspace(result)
+
+        // 3. Write everything up, reporting what is going where.
+        setStepLabel('Saving to your database')
+        await pushAll(workspaceId, setProgress)
+
+        // 4. Read it back, so what is on screen is what is actually stored.
+        setStepLabel('Opening your studio')
+        await hydrate(workspaceId)
+        startSync(workspaceId)
+        setPhase('ready')
+      } catch (caught) {
+        setError(describe(caught))
+        setPhase('error')
+      }
+    },
+    [session, applySetup, completeSetup, updateSettings],
+  )
+
+  /* --------------------------------------------------------------- render */
+
   if (phase === 'signed-out') return <SignIn />
-  if (phase === 'checking' || phase === 'loading') return <Loading />
-  if (phase === 'error') return <ConnectionError message={error} onRetry={() => setPhase('loading')} />
+  if (phase === 'setup') {
+    return <Onboarding onProvision={provision} defaultEmail={session?.user.email ?? ''} />
+  }
+  if (phase === 'provisioning') {
+    return <Provisioning label={stepLabel} progress={progress} />
+  }
+  if (phase === 'checking' || phase === 'resolving') return <Loading label={stepLabel} />
+  if (phase === 'error') {
+    return <ConnectionError message={error} onRetry={() => setPhase('resolving')} />
+  }
   return <>{children}</>
 }
 
 /* ------------------------------------------------------------- workspace -- */
 
-/**
- * Every user belongs to exactly one workspace in this version.
- *
- * Bootstrapping goes through a security-definer function rather than two
- * client inserts: creating the workspace and the owner's membership has to be
- * atomic, and doing it from the client means the very first insert has to pass
- * policies that cannot yet see a membership row.
- */
-async function resolveWorkspace(session: Session): Promise<string> {
+/** The caller's workspace id, or null if they have not set one up yet. */
+async function findWorkspace(): Promise<string | null> {
   const supabase = requireSupabase()
-  const local = useStore.getState().settings.workspace
 
-  const { data, error } = await supabase.rpc('current_workspace', {
-    p_name: local.name || 'My studio',
-    p_tagline: local.tagline ?? '',
-    p_accent: local.accent ?? 'lime',
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .order('created_at')
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return (data?.workspace_id as string) ?? null
+}
+
+/**
+ * Creates the workspace and the owner's membership in one security-definer
+ * call. Doing it from the client as two inserts is not atomic, and the first
+ * insert has to satisfy a policy that cannot yet see a membership row.
+ */
+async function createWorkspace(result: SetupResult): Promise<string> {
+  const supabase = requireSupabase()
+
+  const { data, error } = await supabase.rpc('create_workspace', {
+    p_name: result.name || 'My studio',
+    p_tagline: result.tagline ?? '',
+    p_accent: result.accent ?? 'lime',
   })
 
-  if (!error && data) return data as string
-
-  // The function is missing until migration 0002 has been run. Say so precisely
-  // rather than surfacing Postgres's "could not find function" verbatim.
-  if (error && /function .*current_workspace/i.test(error.message)) {
-    throw new Error(
-      'The workspace bootstrap function is missing. Run supabase/migrations/0002_bootstrap.sql in the SQL editor.',
-    )
-  }
-
   if (error) {
-    // If the database cannot see the session, every policy check fails and the
-    // real problem is the request, not the schema.
+    if (/function .*create_workspace/i.test(error.message)) {
+      throw new Error(
+        'The workspace bootstrap function is missing. Run supabase/migrations/0002_bootstrap.sql in the SQL editor.',
+      )
+    }
     const { data: uid } = await supabase.rpc('whoami')
     if (!uid) {
       throw new Error(
         `The database did not receive your session, so every permission check failed. ` +
-          `You are signed in as ${session.user.email}, but Postgres saw an anonymous request. ` +
           `Original error: ${error.message}`,
       )
     }
     throw new Error(error.message)
   }
 
-  throw new Error('Could not resolve a workspace for this account.')
+  if (!data) throw new Error('The workspace was not created.')
+  return data as string
 }
+
+function describe(caught: unknown): string {
+  return caught instanceof Error ? caught.message : String(caught)
+}
+
+/** Let React paint the state change before the next await blocks the thread. */
+const tick = () => new Promise((resolve) => setTimeout(resolve, 60))
 
 /* ---------------------------------------------------------------- screens -- */
 
@@ -172,7 +259,6 @@ function SignIn() {
     }
     if (mode === 'sign-up') {
       setMessage('Check your email to confirm the address, then sign in.')
-      toast.success('Account created')
     }
   }
 
@@ -187,11 +273,7 @@ function SignIn() {
       </div>
 
       <Card variant="raised" padding="lg" radius="3xl">
-        <div
-          role="tablist"
-          aria-label="Sign in or create an account"
-          className="mb-6 flex gap-1.5"
-        >
+        <div role="tablist" aria-label="Sign in or create an account" className="mb-6 flex gap-1.5">
           {(['sign-in', 'sign-up'] as const).map((option) => (
             <button
               key={option}
@@ -252,19 +334,95 @@ function SignIn() {
   )
 }
 
-function Loading() {
+function Loading({ label }: { label: string }) {
   return (
     <Shell>
       <div className="flex flex-col items-center gap-5">
         <Logo size={44} />
-        <p className="text-base text-ink-muted">Opening your studio…</p>
-        <div className="w-full space-y-2">
+        <p className="flex items-center gap-2 text-base text-ink-muted">
+          <Loader2 size={15} className="animate-spin" aria-hidden />
+          {label}…
+        </p>
+        <div className="w-full space-y-2" aria-hidden>
           <Skeleton className="h-3 w-full" />
           <Skeleton className="h-3 w-4/5" />
           <Skeleton className="h-3 w-2/3" />
         </div>
       </div>
     </Shell>
+  )
+}
+
+/**
+ * Provisioning can move a few hundred records, so it says what it is doing and
+ * how far along it is rather than showing an unqualified spinner.
+ */
+function Provisioning({ label, progress }: { label: string; progress: PushProgress | null }) {
+  const workspace = useStore((s) => s.settings.workspace)
+  const seen = useRef<string[]>([])
+
+  if (progress?.label && progress.label !== 'done' && !seen.current.includes(progress.label)) {
+    seen.current = [...seen.current.slice(-3), progress.label]
+  }
+
+  const ratio = progress ? progress.done / Math.max(1, progress.total) : 0
+
+  return (
+    <div className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center gap-4 text-center">
+          <Logo size={48} />
+          <div>
+            <h1 className="text-title font-medium tracking-title text-balance">
+              Building {workspace.name || 'your studio'}
+            </h1>
+            <p className="mt-2 text-base text-pretty text-ink-muted">
+              Setting up your workspace, your pipeline and your profile. This only happens once.
+            </p>
+          </div>
+        </div>
+
+        <Card variant="raised" padding="lg" radius="3xl">
+          <p
+            className="flex items-center gap-2.5 text-base font-medium"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 size={16} className="animate-spin text-ink-muted" aria-hidden />
+            {label}
+          </p>
+
+          {progress && (
+            <>
+              <Meter value={ratio} tone="lime" className="mt-4" label="Setup progress" />
+              <p className="tabular mt-2 flex items-baseline justify-between text-xs text-ink-muted">
+                <span>
+                  {progress.label === 'done' ? 'Finishing up' : `Writing ${progress.label}`}
+                </span>
+                <span>
+                  {progress.done} of {progress.total}
+                </span>
+              </p>
+            </>
+          )}
+
+          {seen.current.length > 0 && (
+            <ul className="mt-5 flex flex-col gap-1.5 border-t border-line-soft pt-4">
+              {seen.current.map((item) => (
+                <li key={item} className="flex items-center gap-2 text-sm text-ink-muted">
+                  <Check size={13} className="shrink-0 text-positive" aria-hidden />
+                  <span className="truncate">Saved {item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <p className="mt-5 text-center text-xs text-ink-faint">
+          Nothing here is permanent — everything can be changed in Settings.
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -280,7 +438,7 @@ function ConnectionError({ message, onRetry }: { message: string; onRetry: () =>
         <h1 className="text-xl font-medium tracking-title">Could not open the workspace</h1>
         <p className="mt-2 text-sm text-pretty text-ink-muted">{message}</p>
         <p className="mt-3 text-xs text-pretty text-ink-faint">
-          If this mentions a missing table or a policy, the migration in
+          If this mentions a missing table or function, a migration in
           <code className="mx-1">supabase/migrations</code> has not been run yet.
         </p>
         <div className="mt-5 flex flex-col gap-2">
@@ -298,10 +456,8 @@ function ConnectionError({ message, onRetry }: { message: string; onRetry: () =>
 
 /* --------------------------------------------------------- mode indicator -- */
 
-/** Small badge for Settings showing where the data actually lives. */
+/** Badge for Settings showing where the data actually lives. */
 export function StorageModeBadge() {
-  const workspace = useStore((s) => s.settings.workspace)
-  void workspace
   return isRemote ? (
     <Pill tone="positive" icon={<Cloud size={11} />}>
       Synced to Supabase
@@ -318,5 +474,4 @@ export async function signOut() {
   await requireSupabase().auth.signOut()
 }
 
-/** Re-export so callers do not need to know where the seed helpers live. */
 export { createSeedDatabase, createEmptyDatabase }

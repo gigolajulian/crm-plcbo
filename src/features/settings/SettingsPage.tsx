@@ -29,6 +29,8 @@ import { toast } from '@/components/ui/feedback'
 import { SectionHeading } from '@/components/common/records'
 import { Wordmark } from '@/components/shell/Logo'
 import { ACCENTS } from '@/features/onboarding/accents'
+import { CURRENCIES, LOCALES } from '@/lib/intl'
+import { StorageModeBadge } from '@/features/auth/AuthGate'
 
 /* ============================================================================
    SETTINGS
@@ -118,6 +120,8 @@ function AccountSettings() {
   const [name, setName] = useState(workspace.ownerName)
   const [role, setRole] = useState(workspace.ownerRole)
   const [email, setEmail] = useState(workspace.ownerEmail)
+  const [currency, setCurrency] = useState(workspace.currency)
+  const [locale, setLocale] = useState(workspace.locale)
   const [rerun, setRerun] = useState(false)
 
   const dirty =
@@ -125,7 +129,9 @@ function AccountSettings() {
     tagline !== workspace.tagline ||
     name !== workspace.ownerName ||
     role !== workspace.ownerRole ||
-    email !== workspace.ownerEmail
+    email !== workspace.ownerEmail ||
+    currency !== workspace.currency ||
+    locale !== workspace.locale
 
   function save() {
     updateWorkspace({
@@ -134,6 +140,8 @@ function AccountSettings() {
       ownerName: name.trim() || workspace.ownerName,
       ownerRole: role.trim(),
       ownerEmail: email.trim(),
+      currency,
+      locale,
     })
     // The owner's profile and their team record are the same person.
     updateTeamMember(currentUserId, {
@@ -147,7 +155,10 @@ function AccountSettings() {
   return (
     <div className="flex flex-col gap-5">
       <Card variant="raised" padding="lg" radius="3xl">
-        <Wordmark className="mb-6" />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <Wordmark />
+          <StorageModeBadge />
+        </div>
 
         <SectionHeading
           title="Your studio"
@@ -182,6 +193,26 @@ function AccountSettings() {
               className="sm:col-span-2"
             />
           </div>
+        </div>
+
+        <SectionHeading
+          title="Money & region"
+          description="Every deal value, budget and revenue figure is shown in this currency, formatted for your region."
+          className="mt-8"
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Select
+            label="Currency"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} — ${c.label}` }))}
+          />
+          <Select
+            label="Region format"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value)}
+            options={LOCALES.map((l) => ({ value: l.code, label: l.label }))}
+          />
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-3">

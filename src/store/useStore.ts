@@ -25,6 +25,7 @@ import type {
 } from '@/data/types'
 import { createEmptyDatabase, createSeedDatabase } from '@/data/seed'
 import { arrayMove, toISODate, uid } from '@/lib/utils'
+import { setMoneyFormat } from '@/lib/intl'
 
 const STORAGE_KEY = 'crmo/v1'
 
@@ -105,6 +106,7 @@ type Actions = {
 
   /* workspace setup */
   updateWorkspace: (patch: Partial<Workspace>) => void
+  applySetup: (result: { pipeline: PipelineStage[]; tags: Tag[]; start: 'demo' | 'empty' }) => void
   completeSetup: (workspace: Partial<Workspace>, start: 'demo' | 'empty') => void
 
   resetDemoData: () => void
@@ -716,6 +718,27 @@ export const useStore = create<Store>()(
         }))
       },
 
+
+      /**
+       * Apply the structural answers from setup: the pipeline the studio
+       * actually sells through, and the services it sells. Starting empty means
+       * these replace the defaults outright; starting from the demo keeps the
+       * seeded stages, because the demo deals are already sitting in them.
+       */
+      applySetup: (result) =>
+        set((s) => {
+          if (result.start === 'demo') {
+            // Merge the chosen services in without dropping the demo's own tags.
+            const existing = new Set(s.tags.map((t) => t.label.toLowerCase()))
+            const added = result.tags.filter((t) => !existing.has(t.label.toLowerCase()))
+            return { tags: [...s.tags, ...added] }
+          }
+          return {
+            pipeline: result.pipeline,
+            tags: result.tags.length > 0 ? result.tags : s.tags,
+          }
+        }),
+
       resetDemoData: () => {
         const fresh = createSeedDatabase()
         // Theme and workspace identity are preferences, not demo data.
@@ -737,3 +760,13 @@ export const useStore = create<Store>()(
     },
   ),
 )
+
+/* ----------------------------------------------------------------- intl -- */
+
+// Currency and locale are read from render paths all over the app, so the
+// formatters keep a module-level copy rather than every call site taking a hook.
+function syncMoneyFormat(state: Store) {
+  setMoneyFormat(state.settings.workspace.currency, state.settings.workspace.locale)
+}
+syncMoneyFormat(useStore.getState())
+useStore.subscribe(syncMoneyFormat)

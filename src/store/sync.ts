@@ -215,12 +215,58 @@ export function stopSync() {
   window.clearTimeout(timer)
 }
 
-/** Push the entire current store up — used when seeding a new workspace. */
-export async function pushAll(ws: string) {
+export interface PushProgress {
+  done: number
+  total: number
+  /** Human label for what is being written right now. */
+  label: string
+}
+
+/** Readable names for the progress indicator, rather than table names. */
+const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
+  team: 'the studio roster',
+  companies: 'companies',
+  contacts: 'clients',
+  projects: 'projects',
+  milestones: 'milestones',
+  tasks: 'tasks',
+  deals: 'the pipeline',
+  pipeline: 'deal stages',
+  moodboards: 'moodboards',
+  moodSections: 'moodboard sections',
+  moodItems: 'references',
+  assets: 'deliverables',
+  assetVersions: 'versions',
+  comments: 'feedback',
+  activity: 'activity history',
+  tags: 'tags',
+  customFields: 'custom fields',
+  savedViews: 'saved views',
+}
+
+/**
+ * Push the entire current store up — used when seeding a new workspace.
+ * Reports progress per collection so setup can show what it is doing rather
+ * than spinning silently through a few hundred inserts.
+ */
+export async function pushAll(ws: string, onProgress?: (progress: PushProgress) => void) {
   workspaceId = ws
   snapshot = {}
-  for (const key of COLLECTIONS) pending.add(key)
+
+  const keys = COLLECTIONS.filter(
+    (key) => (useStore.getState()[key] as unknown[]).length > 0,
+  )
+  const total = keys.length + 1
+
+  for (const [index, key] of keys.entries()) {
+    onProgress?.({ done: index, total, label: COLLECTION_LABELS[key] ?? key })
+    pending.add(key)
+    await flush()
+  }
+
+  onProgress?.({ done: total - 1, total, label: 'your preferences' })
   await flush()
+  onProgress?.({ done: total, total, label: 'done' })
 }
 
 /** The workspace the app is currently synced to, or null in local mode. */
