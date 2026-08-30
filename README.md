@@ -1,11 +1,15 @@
 # CRMO
 
+### → [**Open the live app**](https://gigolajulian.github.io/crmo/)
+
 A creative relationship management workspace for a design studio — clients, projects,
 moodboards, deals, tasks, feedback and approvals in one place.
 
 Built to feel like a project studio rather than a corporate admin panel: a warm-grey
 canvas, soft panels, a single saturated accent, and a component language made
 almost entirely of pills.
+
+[![Deploy](https://github.com/gigolajulian/crmo/actions/workflows/deploy.yml/badge.svg)](https://github.com/gigolajulian/crmo/actions/workflows/deploy.yml)
 
 ## Running it
 
