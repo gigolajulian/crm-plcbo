@@ -17,8 +17,8 @@ npm install
 npm run dev
 ```
 
-The app opens at `http://localhost:5173`. There is no backend — everything runs in
-the browser and persists to `localStorage`.
+The app opens at `http://localhost:5173`. With no Supabase credentials configured it
+runs entirely in the browser against `localStorage` — see **Connecting Supabase** below.
 
 | Command | What it does |
 | --- | --- |
@@ -42,26 +42,72 @@ grey and near-black. Five presets ship (lime, amber, coral, sky, iris), each
 defined once in `tokens.css` under a `[data-accent]` block for both themes, and
 each light enough to carry near-black text well above 4.5:1.
 
+
+## Live demo
+
+**https://gigolajulian.github.io/crmo/**
+
+Runs in local mode — no account, no server, everything in your browser. Deployed
+from `main` by `.github/workflows/deploy.yml`.
+
+## Connecting Supabase
+
+Without credentials CRMO is local-only and works offline. Add them and it becomes
+a real multi-user app with auth, Postgres and file storage.
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor**, paste `supabase/migrations/0001_init.sql`, run it. That
+   creates the tables, the row-level security policies and the storage bucket.
+3. Copy **Project Settings → API** into `.env.local`:
+
+   ```
+   VITE_SUPABASE_URL=https://xxxx.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJ...
+   ```
+
+4. `npm run dev`. You get a sign-in screen; create an account and your workspace
+   is provisioned from whatever the setup flow produced locally.
+
+To deploy it connected, add the same two values as **repository secrets** named
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — the workflow already reads them.
+
+**The anon key is public by design.** It ships in the JavaScript bundle. Your data
+is protected by the RLS policies in the migration and nothing else, which is why
+every table is locked to workspace members. Never put the `service_role` key in the
+client: it bypasses RLS entirely.
+
+### How sync works
+
+The ~40 store actions are untouched. `store/sync.ts` subscribes to the store,
+diffs each collection by id against the last synced snapshot, and pushes only what
+changed — debounced 400ms and coalesced, so dragging a moodboard item is one round
+trip rather than thirty. A failed flush keeps its old snapshot so the change is
+retried instead of silently lost.
+
+Conflict resolution is last-write-wins. Honest for a studio where two people rarely
+edit the same record in the same second; per-field versioning is the next step.
+
 ## Architecture
 
 ```
 src/
   styles/tokens.css     Design tokens as CSS variables — light and dark
   styles/base.css       Reset, focus rings, scrollbars, motion, reduced-motion
-  lib/                  brand · utils · art (generative fallback) · hotkeys
-  data/                 types · images (curated photography) · seed/ (demo studio)
-  store/                useStore (zustand + persist) · selectors · useUI
+  lib/                  brand · utils · art (generative fallback) · hotkeys · supabase
+  data/                 types · schema (table map) · images · seed/ (demo studio)
+  store/                useStore (zustand) · selectors · sync (Supabase) · useUI
   components/
     ui/                 primitives · form · overlay · feedback · Avatar · Tabs
     charts/             hand-drawn SVG chart primitives
     shell/              AppShell · CommandPalette · QuickAdd · Logo · nav
     common/             Img · records · PageHeader · FilterBar
-  features/             onboarding · dashboard · projects · moodboard · contacts
-                        deals · tasks · activity · approvals · reports · settings
+  features/             auth · onboarding · dashboard · projects · moodboard
+                        contacts · deals · tasks · activity · approvals · reports
+                        settings
 ```
 
 **Stack.** Vite · React 19 · TypeScript · Tailwind v4 (CSS-first `@theme`) ·
-React Router 7 · Zustand (persisted) · dnd-kit · lucide-react.
+React Router 7 · Zustand · dnd-kit · lucide-react · Supabase (optional).
 
 A few decisions worth knowing about:
 
@@ -85,12 +131,12 @@ implemented so it behaves completely rather than being a dead end:
 
 | Area | How it works |
 | --- | --- |
-| **Persistence** | `localStorage` via zustand's `persist`. Every create, edit, drag and decision survives a reload. Settings → Demo data resets it. |
-| **File upload** | "Add reference" and "Upload new version" pick from a curated photo library instead of opening a file dialog. The records, versions and approval trail behave exactly as they would with real uploads. |
+| **Persistence** | Local mode uses `localStorage`; connected mode uses Postgres. Both survive a reload. |
+| **File upload** | Still the curated photo library rather than a file dialog. The storage bucket and `storage_path` column exist; wiring the picker to them is the remaining step. |
 | **Photography** | Curated Unsplash URLs, each checked to resolve. If one fails — offline, dead URL — `lib/art.ts` renders deterministic generated artwork seeded from the record id, so no image is ever broken. |
 | **Avatars** | `pravatar.cc`, falling back to tinted initials. |
 | **Email / calendar** | Activity entries are logged by hand through Quick add rather than synced from a provider. |
-| **Accounts & auth** | Setup creates a local profile in this browser. There is no server, no password and no sign-in. Roles are stored and reflected in the UI, not enforced by a backend; "View as" in Settings switches the current user. |
+| **Accounts & auth** | Local mode has no sign-in — setup creates a browser-local profile. Connected mode uses real Supabase auth. Roles are reflected in the UI but only RLS enforces tenancy; per-role write rules are next. |
 | **Notifications** | Preferences are stored; nothing is actually delivered. |
 
 ## Accessibility
