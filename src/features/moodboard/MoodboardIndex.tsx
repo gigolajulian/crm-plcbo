@@ -80,7 +80,7 @@ export default function MoodboardIndex() {
       ) : cards.length === 0 ? (
         <NoResults query={query} onClear={() => setQuery('')} entity="moodboards" />
       ) : (
-        <ul className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card, index) => (
             <li key={card.board.id} style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}>
               <Card

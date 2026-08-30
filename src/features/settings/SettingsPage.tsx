@@ -55,7 +55,7 @@ export default function SettingsPage() {
         description={`How ${BRAND.full} behaves for you and the rest of the studio.`}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[220px_1fr]">
         <nav aria-label="Settings sections">
           <ul className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 lg:flex-col lg:gap-0.5 lg:overflow-visible">
             {SECTIONS.map((item) => {
@@ -112,7 +112,7 @@ function Appearance() {
       <Card variant="raised" padding="lg" radius="3xl">
         <Wordmark className="mb-6" />
         <SectionHeading title="Theme" description="Applies immediately, and is remembered." />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {themes.map((theme) => {
             const Icon = theme.icon
             const active = settings.theme === theme.id
@@ -143,7 +143,7 @@ function Appearance() {
 
       <Card variant="surface" padding="lg" radius="2xl">
         <SectionHeading title="Density" description="How much breathing room lists get." />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {(['comfortable', 'compact'] as const).map((density) => (
             <button
               key={density}
@@ -281,7 +281,7 @@ function TeamSettings() {
             setRole('')
             setEmail('')
           }}
-          className="grid gap-3 sm:grid-cols-3"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
           <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
           <Input label="Role" placeholder="Designer" value={role} onChange={(e) => setRole(e.target.value)} />

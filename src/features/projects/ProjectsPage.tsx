@@ -242,7 +242,7 @@ export default function ProjectsPage() {
 
 function GalleryView({ projects }: { projects: Project[] }) {
   return (
-    <ul className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {projects.map((project, index) => (
         <li key={project.id} style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}>
           <ProjectCard project={project} size="lg" />

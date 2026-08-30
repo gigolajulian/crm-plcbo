@@ -76,7 +76,7 @@ export default function ActivityPage() {
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.7fr_1fr]">
         <div>
           <div className="mb-5 flex flex-wrap items-center gap-2">
             <SearchInput

@@ -75,8 +75,11 @@ export default function DealDetail() {
                 .map((s) => ({
                   label: `Move to ${s.name}`,
                   onSelect: () => {
+                    const from = deal.stageId
                     moveDeal(deal.id, s.id)
-                    toast.success(`Moved to ${s.name}`)
+                    toast.success(`Moved to ${s.name}`, {
+                      action: { label: 'Undo', onClick: () => moveDeal(deal.id, from) },
+                    })
                   },
                 }))}
               trigger={({ onClick, ...rest }) => (
@@ -92,11 +95,11 @@ export default function DealDetail() {
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-5">
           {/* ------------------------------------------------------ money */}
           <Card variant="raised" padding="lg" radius="3xl">
-            <div className="grid gap-6 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
               <div>
                 <p className="eyebrow mb-1.5">Value</p>
                 <p className="tabular text-display font-medium tracking-display">

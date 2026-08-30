@@ -147,7 +147,7 @@ export default function ContactsPage() {
         ) : filteredContacts.length === 0 ? (
           <NoResults query={query} onClear={clear} entity="people" />
         ) : (
-          <ul className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filteredContacts.map((contact, index) => {
               const company = companies.find((c) => c.id === contact.companyId)
               const contactProjects = projects.filter(
@@ -225,7 +225,7 @@ export default function ContactsPage() {
       ) : filteredCompanies.length === 0 ? (
         <NoResults query={query} onClear={clear} entity="companies" />
       ) : (
-        <ul className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filteredCompanies.map((company, index) => {
             const people = contacts.filter((c) => c.companyId === company.id)
             const live = projects.filter(

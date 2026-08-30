@@ -51,7 +51,7 @@ export function ProjectBrief({ project }: { project: Project }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.7fr_1fr]">
       <Card variant="raised" padding="lg" radius="3xl">
         <article className="flex flex-col gap-8">
           {FIELDS.map((field) => {

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, Plus, Search } from 'lucide-react'
 import { BRAND } from '@/lib/brand'
@@ -90,8 +90,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [navigate])
 
-  /* Move focus to the main region on navigation so keyboard users keep place. */
+  /*
+   * Move focus to the main region when the route changes, so a keyboard user
+   * lands in the new content rather than back at the top of the rail. Skipped
+   * on the very first render — otherwise the skip link, which should be the
+   * first thing Tab reaches, becomes unreachable.
+   */
+  const firstRender = useRef(true)
   useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
     document.getElementById('main')?.focus({ preventScroll: true })
   }, [location.pathname])
 
@@ -209,7 +219,9 @@ function TopBar({ onSearch, onQuickAdd }: { onSearch: () => void; onQuickAdd: ()
           type="button"
           onClick={onSearch}
           className={cn(
-            'group flex h-10 flex-1 items-center gap-2.5 rounded-pill bg-raised pr-2 pl-4 text-left shadow-xs',
+            // min-w-0 lets the button shrink below its label's min-content
+            // width, which is what keeps the bar inside a 375px viewport.
+            'group flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-pill bg-raised pr-2 pl-4 text-left shadow-xs',
             'transition-shadow duration-fast ease-out-soft hover:shadow-sm sm:max-w-md',
           )}
         >
@@ -297,13 +309,13 @@ function MobileTabBar({ onQuickAdd }: { onQuickAdd: () => void }) {
 function MobileTab({ item }: { item: (typeof NAV)[number] }) {
   const Icon = item.icon
   return (
-    <li className="flex-1">
+    <li className="min-w-0 flex-1">
       <NavLink
         to={item.to}
         end={item.to === '/'}
         className={({ isActive }) =>
           cn(
-            'flex flex-col items-center gap-1 py-2.5 text-2xs font-medium transition-colors duration-fast',
+            'flex flex-col items-center gap-1 px-1 py-2.5 text-2xs font-medium transition-colors duration-fast',
             isActive ? 'text-ink' : 'text-ink-faint',
           )
         }
@@ -311,7 +323,7 @@ function MobileTab({ item }: { item: (typeof NAV)[number] }) {
         {({ isActive }) => (
           <>
             <Icon size={20} strokeWidth={isActive ? 2 : 1.6} aria-hidden />
-            {item.label}
+            <span className="w-full truncate text-center">{item.label}</span>
           </>
         )}
       </NavLink>

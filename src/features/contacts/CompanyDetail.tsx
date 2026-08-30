@@ -120,7 +120,7 @@ export default function CompanyDetail() {
         <TagList ids={company.tags} size="md" className="mt-4" />
       </Card>
 
-      <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex flex-col gap-5">
           <section>
             <SectionHeading title="Projects" count={projects.length} />

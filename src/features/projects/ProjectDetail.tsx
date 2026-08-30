@@ -142,7 +142,7 @@ export default function ProjectDetail() {
 
       {/* -------------------------------------------------------- hero */}
       <Card variant="raised" padding="none" radius="3xl" className="mb-6 overflow-hidden">
-        <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1.4fr_1fr]">
           <Img
             src={project.coverUrl}
             seed={project.artSeed}
@@ -315,7 +315,7 @@ function ProjectTasks({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
       <div>
         <Card variant="raised" padding="md" radius="2xl" className="mb-4">
           <form onSubmit={quickAdd} className="flex items-center gap-2">

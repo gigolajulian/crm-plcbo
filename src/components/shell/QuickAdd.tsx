@@ -121,7 +121,7 @@ function TaskForm({ onDone }: { onDone: () => void }) {
         required
         autoFocus
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           label="Project"
           placeholder="No project"
@@ -229,7 +229,7 @@ function LogForm({ onDone }: { onDone: () => void }) {
         onChange={(e) => setBody(e.target.value)}
         rows={4}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           label="Client"
           placeholder="No client"
@@ -312,7 +312,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         required
         autoFocus
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           label="Company"
           value={companyId}
@@ -400,7 +400,7 @@ function ContactForm({ onDone }: { onDone: () => void }) {
         required
         autoFocus
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input label="Role" placeholder="Brand Director" value={role} onChange={(e) => setRole(e.target.value)} />
         <Input
           label="Email"
@@ -487,7 +487,7 @@ function DealForm({ onDone }: { onDone: () => void }) {
         required
         autoFocus
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           label="Company"
           value={companyId}

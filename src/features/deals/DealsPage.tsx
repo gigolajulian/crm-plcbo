@@ -351,8 +351,11 @@ function DealCard({ deal, preview }: { deal: Deal; preview?: boolean }) {
                 .map((s) => ({
                   label: `Move to ${s.name}`,
                   onSelect: () => {
+                    const from = deal.stageId
                     moveDeal(deal.id, s.id)
-                    toast.success(`${deal.name} → ${s.name}`)
+                    toast.success(`${deal.name} → ${s.name}`, {
+                      action: { label: 'Undo', onClick: () => moveDeal(deal.id, from) },
+                    })
                   },
                 }))}
               trigger={({ onClick, ...rest }) => (
@@ -458,8 +461,11 @@ function PipelineList({ deals }: { deals: Deal[] }) {
                         .map((s) => ({
                           label: `Move to ${s.name}`,
                           onSelect: () => {
+                            const from = deal.stageId
                             moveDeal(deal.id, s.id)
-                            toast.success(`${deal.name} → ${s.name}`)
+                            toast.success(`${deal.name} → ${s.name}`, {
+                              action: { label: 'Undo', onClick: () => moveDeal(deal.id, from) },
+                            })
                           },
                         }))}
                       trigger={({ onClick, ...rest }) => (

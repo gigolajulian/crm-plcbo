@@ -7,7 +7,7 @@ import { useReviewQueue } from '@/store/selectors'
 import { cn, formatRelativeTime, pluralize } from '@/lib/utils'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Card, Chip, Pill } from '@/components/ui/primitives'
-import { EmptyState } from '@/components/ui/feedback'
+import { EmptyState, NoResults } from '@/components/ui/feedback'
 import { Img } from '@/components/common/Img'
 import { ApprovalBadge, SectionHeading } from '@/components/common/records'
 import { ReviewRoom } from './ReviewRoom'
@@ -87,13 +87,18 @@ export default function ApprovalsPage() {
       ) : (
         <div className="flex flex-col gap-6">
           <section>
-            <SectionHeading title="Queue" count={queue.length} />
+            <SectionHeading
+              title="Queue"
+              count={queue.length}
+              description="The latest version of every deliverable."
+            />
             {queue.length === 0 ? (
-              <p className="rounded-2xl bg-surface px-4 py-8 text-center text-sm text-ink-muted">
-                Nothing matches those filters.
-              </p>
+              <NoResults
+                entity="versions"
+                onClear={() => setStatuses(['pending', 'changes-requested', 'approved', 'draft'])}
+              />
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {queue.map((item) => (
                   <li key={item.versionId}>
                     <button
@@ -155,23 +160,27 @@ export default function ApprovalsPage() {
             )}
           </section>
 
-          <section>
-            <SectionHeading
-              title="Review room"
-              description={
-                focusedAsset
-                  ? 'Comment, approve, or ask for changes — every decision is kept.'
-                  : 'Pick something from the queue above to review it.'
-              }
-            />
-            <ReviewRoom assetIds={focusedAsset ? [focusedAsset] : queue.map((q) => q.assetId)} />
-          </section>
+          {/* The room is only shown when the queue has something in it —
+              otherwise its own empty state reads as "no work exists". */}
+          {queue.length > 0 && (
+            <section>
+              <SectionHeading
+                title="Review room"
+                description={
+                  focusedAsset
+                    ? 'Comment, approve, or ask for changes — every decision is kept.'
+                    : 'Showing the first in the queue. Pick another above to switch.'
+                }
+              />
+              <ReviewRoom assetIds={focusedAsset ? [focusedAsset] : queue.map((q) => q.assetId)} />
+            </section>
+          )}
         </div>
       )}
 
       {/* Legend clarifies what each status actually commits you to. */}
       <Card variant="surface" padding="md" radius="2xl" className="mt-6">
-        <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {(Object.keys(APPROVAL_STATUS) as ApprovalStatus[]).map((status) => (
             <div key={status}>
               <dt className="mb-1.5">

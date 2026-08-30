@@ -26,9 +26,30 @@ function useOverlayBehaviour(
   onClose: () => void,
   ref: RefObject<HTMLElement | null>,
 ) {
+  /*
+   * Held in a ref rather than a local, so React's development double-invocation
+   * of effects cannot capture an element inside the overlay as the thing to
+   * return focus to. Only the first open of a cycle records the opener.
+   */
+  const opener = useRef<HTMLElement | null>(null)
+  if (open && !opener.current) {
+    opener.current = document.activeElement as HTMLElement | null
+  }
+
   useEffect(() => {
-    if (!open) return
-    const previouslyFocused = document.activeElement as HTMLElement | null
+    if (!open) {
+      const toRestore = opener.current
+      opener.current = null
+      if (toRestore?.isConnected) {
+        // After the portal is gone: removing the focused subtree sends focus
+        // to <body>, so restoring any earlier would be undone.
+        requestAnimationFrame(() => {
+          if (toRestore.isConnected) toRestore.focus()
+        })
+      }
+      return
+    }
+    const previouslyFocused = opener.current
 
     // Lock scroll without the layout jump from a disappearing scrollbar.
     const scrollbar = window.innerWidth - document.documentElement.clientWidth
@@ -69,7 +90,7 @@ function useOverlayBehaviour(
       window.clearTimeout(focusTimer)
       document.body.style.overflow = overflow
       document.body.style.paddingRight = paddingRight
-      previouslyFocused?.focus?.()
+      void previouslyFocused
     }
   }, [open, onClose, ref])
 }

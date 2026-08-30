@@ -89,7 +89,7 @@ export default function ContactDetail() {
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.6fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.6fr]">
         {/* ------------------------------------------------------ profile */}
         <div className="flex flex-col gap-5">
           <Card variant="raised" padding="lg" radius="3xl">

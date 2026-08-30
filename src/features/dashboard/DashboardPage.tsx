@@ -87,7 +87,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
         {/* ---------------------------------------------- priority column */}
         <div className="flex flex-col gap-4 lg:col-span-2 lg:gap-5">
           <PriorityPanel actions={actions} />
@@ -210,7 +210,7 @@ function ActiveProjects({ projects }: { projects: ReturnType<typeof useActivePro
           }
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {projects.map((project) => (
             <li key={project.id}>
               <ProjectCard project={project} />

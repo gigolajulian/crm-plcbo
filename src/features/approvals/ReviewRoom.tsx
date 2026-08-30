@@ -149,7 +149,7 @@ export function ReviewRoom({
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_1fr]">
       {/* ------------------------------------------------------- asset list */}
       <aside className="lg:order-first">
         <SectionHeading title="Deliverables" count={assets.length} />
@@ -311,7 +311,7 @@ export function ReviewRoom({
         </Card>
 
         {/* -------------------------------------------------- conversation */}
-        <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
           <Card variant="raised" padding="md" radius="2xl">
             <SectionHeading title="Feedback" count={versionComments.length} />
 

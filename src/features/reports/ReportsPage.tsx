@@ -131,7 +131,7 @@ export default function ReportsPage() {
         description="How the work, the money and the people are actually doing this quarter."
       />
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
         {/* ------------------------------------------------- headline row */}
         <Card variant="inverse" padding="lg" radius="3xl" className="lg:col-span-2">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
