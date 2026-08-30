@@ -7,6 +7,8 @@ import { cn, hashCode, readableOn } from '@/lib/utils'
 import { Button, Pill } from '@/components/ui/primitives'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import { Sheet } from '@/components/ui/overlay'
+import { ImageDrop } from '@/components/common/ImageDrop'
+import type { UploadResult } from '@/lib/uploads'
 import { toast } from '@/components/ui/feedback'
 
 /* ============================================================================
@@ -68,6 +70,7 @@ export function AddReferenceSheet({
   const [set, setSet] = useState<PhotoSet>('interiors')
   const [pickedIndex, setPickedIndex] = useState(0)
   const [asMaterial, setAsMaterial] = useState(false)
+  const [uploaded, setUploaded] = useState<UploadResult | null>(null)
   // colour
   const [hex, setHex] = useState('#C7F33C')
   const [colorName, setColorName] = useState('')
@@ -94,6 +97,7 @@ export function AddReferenceSheet({
       setColorName('')
       setPickedIndex(0)
       setAsMaterial(false)
+      setUploaded(null)
     }
   }, [sectionId])
 
@@ -106,8 +110,18 @@ export function AddReferenceSheet({
 
     switch (kind) {
       case 'image': {
-        const id = PHOTO_SETS[set][pickedIndex % PHOTO_SETS[set].length]
         itemKind = asMaterial ? 'material' : 'image'
+        // An uploaded file wins over the library pick when there is one.
+        if (uploaded) {
+          payload = {
+            kind: itemKind as 'image' | 'material',
+            url: uploaded.url,
+            artSeed: uploaded.path,
+            ratio: uploaded.ratio,
+          }
+          break
+        }
+        const id = PHOTO_SETS[set][pickedIndex % PHOTO_SETS[set].length]
         payload = {
           kind: itemKind as 'image' | 'material',
           url: photo(id, 'tile'),
@@ -224,6 +238,12 @@ export function AddReferenceSheet({
         {/* ----------------------------------------------------- image */}
         {kind === 'image' && (
           <div className="flex flex-col gap-3">
+            <ImageDrop
+              folder="moodboards"
+              label="Upload a reference"
+              onUploaded={setUploaded}
+            />
+
             <Select
               label="Library"
               value={set}
@@ -235,7 +255,7 @@ export function AddReferenceSheet({
                 value: key,
                 label: key.charAt(0).toUpperCase() + key.slice(1),
               }))}
-              hint="A curated set stands in for an upload — see the README."
+              hint={uploaded ? "Your upload will be used instead." : "Or pick from the curated set."}
             />
             <fieldset>
               <legend className="eyebrow mb-2">Pick one</legend>

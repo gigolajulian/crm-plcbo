@@ -12,6 +12,8 @@ import { ConfirmDialog, Lightbox, Menu } from '@/components/ui/overlay'
 import { EmptyState, toast } from '@/components/ui/feedback'
 import { Img } from '@/components/common/Img'
 import { ApprovalBadge, SectionHeading } from '@/components/common/records'
+import { ImageDrop } from '@/components/common/ImageDrop'
+import { canUpload } from '@/lib/uploads'
 
 /* ============================================================================
    REVIEW ROOM
@@ -55,6 +57,7 @@ export function ReviewRoom({
   const [draft, setDraft] = useState('')
   const [lightbox, setLightbox] = useState(false)
   const [confirming, setConfirming] = useState<null | { status: ApprovalStatus; label: string }>(null)
+  const [uploading, setUploading] = useState(false)
 
   const asset = assets.find((a) => a.id === selectedAssetId) ?? assets[0]
   const assetVersions = useMemo(
@@ -288,20 +291,57 @@ export function ReviewRoom({
             <Button
               className="ml-auto"
               icon={<Upload size={15} />}
-              onClick={() => {
-                const next = assetVersions.length
-                addAssetVersion(asset.id, {
-                  url: photo(PHOTO_SETS.studio[next % PHOTO_SETS.studio.length], 'card'),
-                  ratio: version.ratio,
-                  status: 'draft',
-                })
-                setSelectedVersionId(null)
-                toast.success('New version uploaded', { detail: 'Saved as a draft.' })
-              }}
+              onClick={() => setUploading((v) => !v)}
+              aria-expanded={uploading}
             >
               Upload new version
             </Button>
           </div>
+
+          {uploading && (
+            <div className="animate-in border-t border-line-soft p-4">
+              {canUpload() ? (
+                <ImageDrop
+                  folder={`assets/${asset.id}`}
+                  label="Upload the next version"
+                  onUploaded={(result) => {
+                    addAssetVersion(asset.id, {
+                      url: result.url,
+                      artSeed: result.path,
+                      ratio: result.ratio,
+                      status: 'draft',
+                    })
+                    setSelectedVersionId(null)
+                    setUploading(false)
+                    toast.success('New version uploaded', { detail: 'Saved as a draft.' })
+                  }}
+                />
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-ink-muted">
+                    Real uploads need a connected workspace. Add a stand-in version instead?
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      const next = assetVersions.length
+                      addAssetVersion(asset.id, {
+                        url: photo(PHOTO_SETS.studio[next % PHOTO_SETS.studio.length], 'card'),
+                        ratio: version.ratio,
+                        status: 'draft',
+                      })
+                      setSelectedVersionId(null)
+                      setUploading(false)
+                      toast.success('New version added', { detail: 'Saved as a draft.' })
+                    }}
+                  >
+                    Add stand-in
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {version.notes && (
             <p className="border-t border-line-soft px-4 py-3 text-sm text-pretty text-ink-muted">

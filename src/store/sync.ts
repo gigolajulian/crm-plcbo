@@ -219,3 +219,8 @@ export async function pushAll(ws: string) {
   for (const key of COLLECTIONS) pending.add(key)
   await flush()
 }
+
+/** The workspace the app is currently synced to, or null in local mode. */
+export function getWorkspaceId(): string | null {
+  return workspaceId
+}
