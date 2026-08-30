@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+
+/* Dark theme is an explicit class on <html>, driven by Settings > Appearance. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================================
+   CRM PLCBO — DESIGN TOKENS
+   Derived from the studio references: warm-neutral canvas, soft off-white
+   panels, near-black ink, a single electric lime accent, pill geometry.
+   ========================================================================== */
+
+@theme {
+  /* --- Neutrals: warm grey, never a blue-grey ---------------------------- */
+  --color-canvas: #e7e7e5;
+  --color-canvas-sunk: #dedeDB;
+  --color-surface: #f2f2f0;
+  --color-surface-hover: #ededea;
+  --color-raised: #ffffff;
+  --color-inverse: #0a0a0a;
+  --color-inverse-soft: #1c1c1b;
+
+  /* --- Ink -------------------------------------------------------------- */
+  --color-ink: #0a0a0a;
+  --color-ink-muted: #63635f; /* 5.9:1 on canvas — safe for body text */
+  --color-ink-faint: #8b8b86; /* >=18px / decorative only */
+  --color-on-inverse: #f7f7f5;
+  --color-on-inverse-muted: #a3a39d;
+
+  /* --- Lines ------------------------------------------------------------ */
+  --color-line: #d6d6d2;
+  --color-line-soft: #e2e2df;
+  --color-line-strong: #c2c2bd;
+
+  /* --- Accent: lime. Background-only, always paired with ink ------------- */
+  --color-lime: #c7f33c;
+  --color-lime-deep: #b2dd2a; /* hover / pressed */
+  --color-lime-pale: #e1f2ae;
+  --color-lime-wash: #eff8d5;
+
+  /* --- Semantic status (muted, so lime stays the loudest thing on screen) */
+  --color-positive: #2f7d4f;
+  --color-positive-wash: #dceee2;
+  --color-caution: #9a6b12;
+  --color-caution-wash: #f5e9cf;
+  --color-critical: #a53232;
+  --color-critical-wash: #f5dede;
+  --color-info: #3a5f8a;
+  --color-info-wash: #dfe8f3;
+
+  /* --- Typography ------------------------------------------------------- */
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-editorial: 'Instrument Serif', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  /* Scale anchored on the reference spec sheet: 34 / 28 / 16 */
+  --text-2xs: 0.6875rem;   /* 11 — micro labels */
+  --text-2xs--line-height: 1.09;
+  --text-xs: 0.75rem;      /* 12 — meta */
+  --text-xs--line-height: 1.33;
+  --text-sm: 0.8125rem;    /* 13 — dense UI */
+  --text-sm--line-height: 1.38;
+  --text-base: 0.9375rem;  /* 15 — default UI */
+  --text-base--line-height: 1.5;
+  --text-body: 1rem;       /* 16 — reading */
+  --text-body--line-height: 1.6;
+  --text-lg: 1.125rem;     /* 18 */
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.375rem;     /* 22 */
+  --text-xl--line-height: 1.25;
+  --text-title: 1.75rem;   /* 28 */
+  --text-title--line-height: 1.14;
+  --text-display: 2.125rem;/* 34 */
+  --text-display--line-height: 1.06;
+  --text-hero: 3rem;       /* 48 */
+  --text-hero--line-height: 1;
+  --text-mega: 4.25rem;    /* 68 — metric numerals */
+  --text-mega--line-height: 0.94;
+
+  --tracking-display: -0.03em;
+  --tracking-title: -0.022em;
+  --tracking-tight: -0.014em;
+  --tracking-label: 0.06em;
+
+  /* --- Radii: pill-first ------------------------------------------------ */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+  --radius-slab: 40px;
+  --radius-pill: 999px;
+
+  /* --- Shadows: wide, soft, low-opacity --------------------------------- */
+  --shadow-xs: 0 1px 2px rgb(10 10 10 / 0.04);
+  --shadow-sm: 0 1px 3px rgb(10 10 10 / 0.05), 0 4px 12px -6px rgb(10 10 10 / 0.06);
+  --shadow-md: 0 2px 6px -2px rgb(10 10 10 / 0.06), 0 12px 28px -12px rgb(10 10 10 / 0.1);
+  --shadow-lg: 0 4px 10px -4px rgb(10 10 10 / 0.07), 0 24px 56px -20px rgb(10 10 10 / 0.14);
+  --shadow-xl: 0 8px 20px -8px rgb(10 10 10 / 0.1), 0 40px 90px -30px rgb(10 10 10 / 0.2);
+  --shadow-lift: 0 10px 24px -10px rgb(10 10 10 / 0.14), 0 32px 64px -28px rgb(10 10 10 / 0.18);
+  --shadow-glow-lime: 0 0 0 1px rgb(199 243 60 / 0.5), 0 8px 30px -8px rgb(199 243 60 / 0.55);
+
+  /* --- Motion: restrained ----------------------------------------------- */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --duration-fast: 130ms;
+  --duration-base: 190ms;
+  --duration-slow: 280ms;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --spacing-rail: 76px;
+  --spacing-gutter: 28px;
+}
+
+/* ============================================================================
+   DARK THEME — the same roles, retuned. Lime stays the single accent; the
+   canvas goes to a warm near-black so panels read as lifted, not inverted.
+   ========================================================================== */
+
+.dark {
+  --color-canvas: #111110;
+  --color-canvas-sunk: #0a0a09;
+  --color-surface: #1a1a18;
+  --color-surface-hover: #212120;
+  --color-raised: #242422;
+  --color-inverse: #f2f2f0;
+  --color-inverse-soft: #e2e2df;
+
+  --color-ink: #f4f4f1;
+  --color-ink-muted: #a5a5a0; /* 6.6:1 on dark canvas */
+  --color-ink-faint: #77776f;
+  --color-on-inverse: #0a0a0a;
+  --color-on-inverse-muted: #4a4a46;
+
+  --color-line: #2e2e2b;
+  --color-line-soft: #232321;
+  --color-line-strong: #3d3d39;
+
+  --color-lime: #c7f33c;
+  --color-lime-deep: #d5ff5c;
+  --color-lime-pale: #3d4a1c;
+  --color-lime-wash: #23280f;
+
+  --color-positive: #6cc48c;
+  --color-positive-wash: #17301f;
+  --color-caution: #d9a441;
+  --color-caution-wash: #322613;
+  --color-critical: #e08585;
+  --color-critical-wash: #351b1b;
+  --color-info: #85a9d4;
+  --color-info-wash: #17222f;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.35), 0 4px 12px -6px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 2px 6px -2px rgb(0 0 0 / 0.4), 0 12px 28px -12px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 4px 10px -4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.6);
+  --shadow-xl: 0 8px 20px -8px rgb(0 0 0 / 0.5), 0 40px 90px -30px rgb(0 0 0 / 0.7);
+  --shadow-lift: 0 10px 24px -10px rgb(0 0 0 / 0.6), 0 32px 64px -28px rgb(0 0 0 / 0.7);
+}

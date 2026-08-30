@@ -1,0 +1,180 @@
+/* ============================================================================
+   BASE — reset, focus, scrollbars, shared utility layers
+   ========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-feature-settings: 'cv05' 1, 'cv08' 1, 'ss03' 1, 'tnum' 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0;
+    font-weight: 500;
+    letter-spacing: var(--tracking-title);
+    text-wrap: balance;
+  }
+
+  p { margin: 0; text-wrap: pretty; }
+  ul, ol { margin: 0; padding: 0; list-style: none; }
+
+  button, input, textarea, select {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+
+  a { color: inherit; text-decoration: none; }
+
+  img, svg, video { display: block; max-width: 100%; }
+
+  hr { border: 0; border-top: 1px solid var(--color-line); margin: 0; }
+
+  /* Focus: never removed, only replaced with something better looking. */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+  .dark :focus-visible { outline-color: var(--color-lime); }
+
+  ::selection {
+    background-color: var(--color-lime);
+    color: #0a0a0a;
+  }
+
+  ::placeholder { color: var(--color-ink-faint); opacity: 1; }
+
+  /* Slim, unobtrusive scrollbars that match the canvas. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-line-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color: var(--color-ink-faint); }
+
+  [hidden] { display: none !important; }
+}
+
+@layer components {
+  /* Numerals in metrics should line up column-to-column. */
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* The all-caps micro label used throughout the references. */
+  .eyebrow {
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /* Screen-reader-only, but focusable (used by the skip link). */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Fade a scrolling region out at its edges rather than drawing a hard rule. */
+  .mask-fade-r {
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent 100%);
+  }
+  .mask-fade-b {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent 100%);
+  }
+
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: fade-rise var(--duration-slow) var(--ease-out-soft) both;
+  }
+  .animate-pop {
+    animation: pop var(--duration-base) var(--ease-spring) both;
+  }
+  .animate-sheet {
+    animation: sheet-rise var(--duration-slow) var(--ease-out-soft) both;
+  }
+  .animate-scrim {
+    animation: fade var(--duration-base) var(--ease-out-soft) both;
+  }
+  .animate-shimmer {
+    animation: shimmer 1.6s linear infinite;
+  }
+  .stagger > * {
+    animation: fade-rise var(--duration-slow) var(--ease-out-soft) both;
+  }
+}
+
+@keyframes fade-rise {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-rise {
+  from { opacity: 0; transform: translate3d(0, 24px, 0) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Respect the system preference: no transitions, no entrance animation. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
