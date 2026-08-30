@@ -2,6 +2,7 @@ import { Component, Suspense, lazy, type ReactNode } from 'react'
 import { Link, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/shell/AppShell'
 import { AuthGate } from '@/features/auth/AuthGate'
+import { UpdateBanner } from '@/components/shell/UpdateBanner'
 import { Button, ButtonLink, Skeleton } from '@/components/ui/primitives'
 import { ErrorState } from '@/components/ui/feedback'
 
@@ -29,6 +30,7 @@ export default function App() {
    */
   return (
     <ErrorBoundary>
+      <UpdateBanner />
       <AuthGate>
         <AppShell>
           <Suspense fallback={<RouteSkeleton />}>
