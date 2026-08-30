@@ -751,12 +751,44 @@ export const useStore = create<Store>()(
     }),
     {
       name: STORAGE_KEY,
-      version: 1,
+      version: 2,
       // Actions are recreated on every load; only the data is persisted.
       partialize: (state) =>
         Object.fromEntries(
           Object.entries(state).filter(([, value]) => typeof value !== 'function'),
         ) as Database,
+
+      /*
+       * The default merge is shallow, so a `settings` object saved before a
+       * field existed replaces the whole thing and silently drops it — which
+       * blanked the app when settings.workspace went missing. Nested objects
+       * are merged over their current defaults so an old snapshot can only ever
+       * be missing values, never structure.
+       */
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<Database>
+        const savedSettings = saved.settings as Partial<Settings> | undefined
+
+        return {
+          ...current,
+          ...saved,
+          settings: {
+            ...current.settings,
+            ...savedSettings,
+            notifications: {
+              ...current.settings.notifications,
+              ...(savedSettings?.notifications ?? {}),
+            },
+            workspace: {
+              ...current.settings.workspace,
+              ...(savedSettings?.workspace ?? {}),
+            },
+          },
+        }
+      },
+
+      // `merge` repairs any shape, so migrating is just a version bump.
+      migrate: (persisted) => persisted as Database,
     },
   ),
 )
@@ -766,7 +798,9 @@ export const useStore = create<Store>()(
 // Currency and locale are read from render paths all over the app, so the
 // formatters keep a module-level copy rather than every call site taking a hook.
 function syncMoneyFormat(state: Store) {
-  setMoneyFormat(state.settings.workspace.currency, state.settings.workspace.locale)
+  // Runs at module scope, where a throw is unrecoverable and blanks the page.
+  // Optional chaining keeps a malformed store a formatting problem, not a crash.
+  setMoneyFormat(state.settings?.workspace?.currency, state.settings?.workspace?.locale)
 }
 syncMoneyFormat(useStore.getState())
 useStore.subscribe(syncMoneyFormat)

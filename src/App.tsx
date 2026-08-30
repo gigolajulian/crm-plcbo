@@ -22,12 +22,17 @@ const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 
 export default function App() {
+  /*
+   * The boundary wraps the shell and the auth gate, not just the routes. A
+   * throw in either used to unmount the whole tree and leave a white page with
+   * nothing to act on — which is exactly what a stale persisted store did.
+   */
   return (
-    <AuthGate>
-    <AppShell>
-      <ErrorBoundary>
-        <Suspense fallback={<RouteSkeleton />}>
-          <Routes>
+    <ErrorBoundary>
+      <AuthGate>
+        <AppShell>
+          <Suspense fallback={<RouteSkeleton />}>
+            <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
@@ -42,13 +47,13 @@ export default function App() {
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </ErrorBoundary>
-    </AppShell>
-    </AuthGate>
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AppShell>
+      </AuthGate>
+    </ErrorBoundary>
   )
 }
 
@@ -98,16 +103,33 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error?: Error }
   render() {
     if (this.state.error) {
       return (
-        <div className="py-16">
-          <ErrorState
-            title="This view could not be rendered"
-            body={this.state.error.message}
-            onRetry={() => this.setState({ error: undefined })}
-          />
-          <div className="mt-4 flex justify-center">
-            <Link to="/">
-              <Button variant="ghost">Back to Today</Button>
-            </Link>
+        <div className="grid min-h-dvh place-items-center bg-canvas px-5 py-16">
+          <div className="w-full max-w-md">
+            <ErrorState
+              title="Something broke on the way in"
+              body={this.state.error.message}
+              onRetry={() => this.setState({ error: undefined })}
+            />
+            <div className="mt-4 flex flex-col items-center gap-3">
+              <Link to="/">
+                <Button variant="ghost">Back to Today</Button>
+              </Link>
+              {/*
+                Data saved by an older version of the app is the likeliest cause
+                of a hard failure this early, so the escape hatch is right here
+                rather than buried in Settings — which may not even render.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('crmo/v1')
+                  window.location.reload()
+                }}
+                className="text-xs text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
+              >
+                Clear this browser's saved data and reload
+              </button>
+            </div>
           </div>
         </div>
       )
