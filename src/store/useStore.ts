@@ -701,21 +701,35 @@ export const useStore = create<Store>()(
           return
         }
 
-        // Keeping the demo studio: rename the owner's own team record so the
-        // workspace reads as theirs rather than as somebody else's.
-        set((s) => ({
-          team: s.team.map((m) =>
-            m.id === s.settings.currentUserId
-              ? {
-                  ...m,
-                  name: workspace.ownerName || m.name,
-                  role: workspace.ownerRole || m.role,
-                  email: workspace.ownerEmail || m.email,
-                }
-              : m,
-          ),
-          settings: { ...s.settings, workspace },
-        }))
+        /*
+         * Asking for the demo studio when the store has been emptied — by a
+         * failed first sign-in, or a reset — has to rebuild it. Renaming the
+         * owner inside an empty roster would otherwise produce a workspace
+         * with nothing in it and no team member to be.
+         */
+        const base = get().team.length === 0 ? createSeedDatabase() : null
+
+        set((s) => {
+          const team = base?.team ?? s.team
+          const currentUserId = base ? base.settings.currentUserId : s.settings.currentUserId
+
+          return {
+            ...(base ?? {}),
+            // Rename the owner's own record so the studio reads as theirs
+            // rather than as somebody else's.
+            team: team.map((m) =>
+              m.id === currentUserId
+                ? {
+                    ...m,
+                    name: workspace.ownerName || m.name,
+                    role: workspace.ownerRole || m.role,
+                    email: workspace.ownerEmail || m.email,
+                  }
+                : m,
+            ),
+            settings: { ...s.settings, currentUserId, workspace },
+          }
+        })
       },
 
 

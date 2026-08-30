@@ -36,6 +36,9 @@ function RemoteGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [progress, setProgress] = useState<PushProgress | null>(null)
   const [stepLabel, setStepLabel] = useState('Creating your workspace')
+  // Set when a workspace row already exists but is empty, so provisioning
+  // fills it in rather than creating a second one.
+  const [existingWorkspace, setExistingWorkspace] = useState<string | null>(null)
 
   const applySetup = useStore((s) => s.applySetup)
   const completeSetup = useStore((s) => s.completeSetup)
@@ -84,8 +87,20 @@ function RemoteGate({ children }: { children: ReactNode }) {
         }
 
         setStepLabel('Opening your studio')
-        await hydrate(existing)
+        const hasData = await hydrate(existing)
         if (cancelled) return
+
+        /*
+         * The workspace row exists but holds nothing — a first sign-in that was
+         * interrupted before its data was written. Finish setup rather than
+         * opening a studio with no team, no pipeline and no way back.
+         */
+        if (!hasData) {
+          setExistingWorkspace(existing)
+          setPhase('setup')
+          return
+        }
+
         startSync(existing)
         setPhase('ready')
       } catch (caught) {
@@ -130,8 +145,8 @@ function RemoteGate({ children }: { children: ReactNode }) {
         await tick()
 
         // 2. Create the workspace row and the owner's membership, atomically.
-        setStepLabel('Creating your workspace')
-        const workspaceId = await createWorkspace(result)
+        setStepLabel(existingWorkspace ? 'Preparing your workspace' : 'Creating your workspace')
+        const workspaceId = existingWorkspace ?? (await createWorkspace(result))
 
         // 3. Write everything up, reporting what is going where.
         setStepLabel('Saving to your database')
@@ -147,7 +162,7 @@ function RemoteGate({ children }: { children: ReactNode }) {
         setPhase('error')
       }
     },
-    [session, applySetup, completeSetup, updateSettings],
+    [session, applySetup, completeSetup, updateSettings, existingWorkspace],
   )
 
   /* --------------------------------------------------------------- render */

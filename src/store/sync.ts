@@ -41,7 +41,15 @@ function indexOf(records: Array<{ id: string }>): Map<string, string> {
 
 /* --------------------------------------------------------------- hydrate -- */
 
-/** Pull the whole workspace into the store. Returns false if it is empty. */
+/**
+ * Pull the whole workspace into the store. Returns false when the workspace is
+ * empty — and crucially, does not touch local state in that case.
+ *
+ * Overwriting unconditionally destroyed data: an interrupted first sign-in left
+ * a workspace row with nothing under it, and hydrating from it wiped the local
+ * store before anything had been pushed. The result was an empty studio with a
+ * currentUserId pointing at a team member that no longer existed.
+ */
 export async function hydrate(ws: string): Promise<boolean> {
   const supabase = requireSupabase()
   workspaceId = ws
@@ -63,6 +71,10 @@ export async function hydrate(ws: string): Promise<boolean> {
       ;(next as any)[key] = records
     }),
   )
+
+  // Nothing there yet. Leave the local store alone so the caller can push it up
+  // rather than losing it.
+  if (total === 0) return false
 
   // Personal preferences are per user as well as per workspace — filtering on
   // the workspace alone returns a row per team member and maybeSingle() throws.
@@ -107,7 +119,7 @@ export async function hydrate(ws: string): Promise<boolean> {
     snapshot[key] = indexOf(state[key] as Array<{ id: string }>)
   }
 
-  return total > 0
+  return true
 }
 
 /* ----------------------------------------------------------------- flush -- */

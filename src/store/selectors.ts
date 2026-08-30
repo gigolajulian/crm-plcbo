@@ -22,10 +22,30 @@ import { daysFromToday, sortBy, sum } from '@/lib/utils'
 
 /* -------------------------------------------------------------- lookups -- */
 
+/**
+ * Never returns undefined. The top bar and half the app read `.name` off this
+ * without guarding, so an empty roster — or a currentUserId pointing at someone
+ * who has been removed — used to crash the whole tree. Falls back to the
+ * workspace owner, who always exists as an identity even if the team does not.
+ */
 export function useCurrentUser(): TeamMember {
   const team = useStore((s) => s.team)
   const id = useStore((s) => s.settings.currentUserId)
-  return team.find((m) => m.id === id) ?? team[0]
+  const workspace = useStore((s) => s.settings.workspace)
+
+  return useMemo(() => {
+    const found = team.find((m) => m.id === id) ?? team[0]
+    if (found) return found
+    return {
+      id: id || 'tm_owner',
+      name: workspace?.ownerName || 'You',
+      role: workspace?.ownerRole || '',
+      permissionRole: 'owner',
+      email: workspace?.ownerEmail || '',
+      capacity: 40,
+      active: true,
+    }
+  }, [team, id, workspace])
 }
 
 export function useMember(id?: ID): TeamMember | undefined {
