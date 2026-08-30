@@ -64,11 +64,14 @@ export async function hydrate(ws: string): Promise<boolean> {
     }),
   )
 
-  // Personal preferences live in their own table, keyed by user.
+  // Personal preferences are per user as well as per workspace — filtering on
+  // the workspace alone returns a row per team member and maybeSingle() throws.
+  const { data: auth } = await supabase.auth.getUser()
   const { data: prefs } = await supabase
     .from('user_settings')
     .select('*')
     .eq('workspace_id', ws)
+    .eq('user_id', auth.user?.id ?? '')
     .maybeSingle()
 
   const { data: ws_row } = await supabase

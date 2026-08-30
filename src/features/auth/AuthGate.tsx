@@ -93,44 +93,48 @@ function RemoteGate({ children }: { children: ReactNode }) {
 /* ------------------------------------------------------------- workspace -- */
 
 /**
- * Every user belongs to exactly one workspace in this version. Returns the
- * existing one, or creates it plus the owner's membership on first sign-in.
+ * Every user belongs to exactly one workspace in this version.
+ *
+ * Bootstrapping goes through a security-definer function rather than two
+ * client inserts: creating the workspace and the owner's membership has to be
+ * atomic, and doing it from the client means the very first insert has to pass
+ * policies that cannot yet see a membership row.
  */
 async function resolveWorkspace(session: Session): Promise<string> {
   const supabase = requireSupabase()
-
-  const { data: membership, error: memberError } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
-    .eq('user_id', session.user.id)
-    .limit(1)
-    .maybeSingle()
-
-  if (memberError) throw new Error(memberError.message)
-  if (membership?.workspace_id) return membership.workspace_id as string
-
   const local = useStore.getState().settings.workspace
-  const { data: created, error: createError } = await supabase
-    .from('workspaces')
-    .insert({
-      owner_id: session.user.id,
-      name: local.name || 'My studio',
-      tagline: local.tagline ?? '',
-      accent: local.accent ?? 'lime',
-    })
-    .select('id')
-    .single()
 
-  if (createError) throw new Error(createError.message)
-
-  const { error: joinError } = await supabase.from('workspace_members').insert({
-    workspace_id: created.id,
-    user_id: session.user.id,
-    permission_role: 'owner',
+  const { data, error } = await supabase.rpc('current_workspace', {
+    p_name: local.name || 'My studio',
+    p_tagline: local.tagline ?? '',
+    p_accent: local.accent ?? 'lime',
   })
-  if (joinError) throw new Error(joinError.message)
 
-  return created.id as string
+  if (!error && data) return data as string
+
+  // The function is missing until migration 0002 has been run. Say so precisely
+  // rather than surfacing Postgres's "could not find function" verbatim.
+  if (error && /function .*current_workspace/i.test(error.message)) {
+    throw new Error(
+      'The workspace bootstrap function is missing. Run supabase/migrations/0002_bootstrap.sql in the SQL editor.',
+    )
+  }
+
+  if (error) {
+    // If the database cannot see the session, every policy check fails and the
+    // real problem is the request, not the schema.
+    const { data: uid } = await supabase.rpc('whoami')
+    if (!uid) {
+      throw new Error(
+        `The database did not receive your session, so every permission check failed. ` +
+          `You are signed in as ${session.user.email}, but Postgres saw an anonymous request. ` +
+          `Original error: ${error.message}`,
+      )
+    }
+    throw new Error(error.message)
+  }
+
+  throw new Error('Could not resolve a workspace for this account.')
 }
 
 /* ---------------------------------------------------------------- screens -- */
