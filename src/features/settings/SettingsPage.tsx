@@ -7,9 +7,11 @@ import {
   Palette,
   Plus,
   RotateCcw,
+  Sparkles,
   Sun,
   Tags,
   Trash2,
+  UserCog,
   Users,
   Workflow,
 } from 'lucide-react'
@@ -19,13 +21,14 @@ import { useActiveTeam } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/brand'
 import { PageHeader } from '@/components/common/PageHeader'
-import { Button, Card, IconButton, Pill } from '@/components/ui/primitives'
+import { Button, Card, IconButton, Meter, Pill } from '@/components/ui/primitives'
 import { Input, Select, Switch } from '@/components/ui/form'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog, Menu } from '@/components/ui/overlay'
 import { toast } from '@/components/ui/feedback'
 import { SectionHeading } from '@/components/common/records'
 import { Wordmark } from '@/components/shell/Logo'
+import { ACCENTS } from '@/features/onboarding/accents'
 
 /* ============================================================================
    SETTINGS
@@ -34,6 +37,7 @@ import { Wordmark } from '@/components/shell/Logo'
    ========================================================================== */
 
 const SECTIONS = [
+  { id: 'account', label: 'Account & studio', icon: UserCog },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'team', label: 'Team & roles', icon: Users },
   { id: 'pipeline', label: 'Pipeline', icon: Workflow },
@@ -45,7 +49,7 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]['id']
 
 export default function SettingsPage() {
-  const [section, setSection] = useState<Section>('appearance')
+  const [section, setSection] = useState<Section>('account')
 
   return (
     <div className="animate-in">
@@ -83,6 +87,7 @@ export default function SettingsPage() {
         </nav>
 
         <div className="min-w-0">
+          {section === 'account' && <AccountSettings />}
           {section === 'appearance' && <Appearance />}
           {section === 'team' && <TeamSettings />}
           {section === 'pipeline' && <PipelineSettings />}
@@ -91,6 +96,123 @@ export default function SettingsPage() {
           {section === 'data' && <DataSettings />}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------- account -- */
+
+/**
+ * The workspace's own identity. A local profile, not authentication — there is
+ * no server behind this, so there is no password and nothing leaves the browser.
+ */
+function AccountSettings() {
+  const workspace = useStore((s) => s.settings.workspace)
+  const updateWorkspace = useStore((s) => s.updateWorkspace)
+  const updateTeamMember = useStore((s) => s.updateTeamMember)
+  const currentUserId = useStore((s) => s.settings.currentUserId)
+  const me = useStore((s) => s.team.find((m) => m.id === s.settings.currentUserId))
+
+  const [studio, setStudio] = useState(workspace.name)
+  const [tagline, setTagline] = useState(workspace.tagline)
+  const [name, setName] = useState(workspace.ownerName)
+  const [role, setRole] = useState(workspace.ownerRole)
+  const [email, setEmail] = useState(workspace.ownerEmail)
+  const [rerun, setRerun] = useState(false)
+
+  const dirty =
+    studio !== workspace.name ||
+    tagline !== workspace.tagline ||
+    name !== workspace.ownerName ||
+    role !== workspace.ownerRole ||
+    email !== workspace.ownerEmail
+
+  function save() {
+    updateWorkspace({
+      name: studio.trim() || workspace.name,
+      tagline: tagline.trim(),
+      ownerName: name.trim() || workspace.ownerName,
+      ownerRole: role.trim(),
+      ownerEmail: email.trim(),
+    })
+    // The owner's profile and their team record are the same person.
+    updateTeamMember(currentUserId, {
+      name: name.trim() || workspace.ownerName,
+      role: role.trim() || me?.role,
+      email: email.trim() || me?.email,
+    })
+    toast.success('Saved')
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card variant="raised" padding="lg" radius="3xl">
+        <Wordmark className="mb-6" />
+
+        <SectionHeading
+          title="Your studio"
+          description="What this workspace is called, wherever it refers to itself."
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input label="Studio name" value={studio} onChange={(e) => setStudio(e.target.value)} />
+          <Input
+            label="Tagline"
+            placeholder="Creative relationship management"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+          />
+        </div>
+
+        <SectionHeading
+          title="You"
+          description="Your profile in the studio — the person work is assigned to and decisions are recorded against."
+          className="mt-8"
+        />
+        <div className="flex items-start gap-4">
+          {me && <Avatar name={me.name} src={me.avatar} size="xl" />}
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input label="Your name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input label="Your role" value={role} onChange={(e) => setRole(e.target.value)} />
+            <Input
+              label="Email"
+              type="email"
+              hint="Stored in this browser only."
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="sm:col-span-2"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <p className="text-xs text-pretty text-ink-muted">
+            {BRAND.product} runs entirely in this browser. There is no sign-in and no server —
+            your workspace lives in local storage.
+          </p>
+          <Button variant="primary" onClick={save} disabled={!dirty}>
+            Save changes
+          </Button>
+        </div>
+      </Card>
+
+      <Card variant="surface" padding="lg" radius="2xl">
+        <SectionHeading
+          title="Run setup again"
+          description="Walk back through the four setup steps to rename the studio, change the accent, or start from an empty workspace."
+        />
+        <Button icon={<Sparkles size={15} />} onClick={() => setRerun(true)}>
+          Open setup
+        </Button>
+      </Card>
+
+      <ConfirmDialog
+        open={rerun}
+        onClose={() => setRerun(false)}
+        title="Run setup again?"
+        body="You will be taken back through the setup steps. Nothing is deleted unless you choose to start from an empty workspace at the end."
+        confirmLabel="Open setup"
+        onConfirm={() => updateWorkspace({ onboarded: false })}
+      />
     </div>
   )
 }
@@ -109,8 +231,9 @@ function Appearance() {
 
   return (
     <div className="flex flex-col gap-5">
+      <AccentPicker />
+
       <Card variant="raised" padding="lg" radius="3xl">
-        <Wordmark className="mb-6" />
         <SectionHeading title="Theme" description="Applies immediately, and is remembered." />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {themes.map((theme) => {
@@ -173,6 +296,65 @@ function Appearance() {
         </div>
       </Card>
     </div>
+  )
+}
+
+/**
+ * The accent is the only chromatic decision in the product — everything else is
+ * warm grey and ink — so it gets its own panel with a real preview.
+ */
+function AccentPicker() {
+  const accent = useStore((s) => s.settings.workspace.accent)
+  const updateWorkspace = useStore((s) => s.updateWorkspace)
+
+  return (
+    <Card variant="raised" padding="lg" radius="3xl">
+      <SectionHeading
+        title="Accent"
+        description="One saturated colour carries every highlight. It is always a background with ink on top, never coloured text."
+      />
+
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+        {ACCENTS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={accent === option.id}
+            onClick={() => {
+              updateWorkspace({ accent: option.id })
+              toast.success(`${option.label} accent`)
+            }}
+            className={cn(
+              'flex flex-col items-start gap-2 rounded-xl p-3 text-left transition-[box-shadow,transform] duration-fast',
+              accent === option.id
+                ? 'bg-surface shadow-md ring-2 ring-ink'
+                : 'bg-surface hover:bg-surface-hover',
+            )}
+          >
+            <span
+              className="h-8 w-full rounded-md"
+              style={{ backgroundColor: option.swatch }}
+              aria-hidden
+            />
+            <span className="text-sm font-medium">{option.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-surface p-4">
+        <span className="eyebrow mr-1">Preview</span>
+        <Pill tone="lime" size="md">
+          Today
+        </Pill>
+        <Pill tone="ink" size="md">
+          In production
+        </Pill>
+        <Button variant="accent" size="sm">
+          Approve
+        </Button>
+        <Meter value={0.68} tone="lime" className="mt-2 w-full" label="Accent meter preview" />
+      </div>
+    </Card>
   )
 }
 

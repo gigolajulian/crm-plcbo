@@ -20,6 +20,7 @@ import { MOBILE_NAV, NAV } from './nav'
 import { CommandPalette } from './CommandPalette'
 import { QuickAdd } from './QuickAdd'
 import { Logo } from './Logo'
+import { Onboarding } from '@/features/onboarding/Onboarding'
 
 /* ============================================================================
    APP SHELL
@@ -38,6 +39,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const theme = useStore((s) => s.settings.theme)
+  const accent = useStore((s) => s.settings.workspace.accent)
+  const onboarded = useStore((s) => s.settings.workspace.onboarded)
+  const studioName = useStore((s) => s.settings.workspace.name)
 
   /* Theme is a class on <html> so every token swap is a single repaint. */
   useEffect(() => {
@@ -55,6 +59,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     media.addEventListener('change', apply)
     return () => media.removeEventListener('change', apply)
   }, [theme])
+
+  /* The accent is a data attribute so its light and dark values stay in CSS. */
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent
+  }, [accent])
+
+  /* The document title follows the studio's own name. */
+  useEffect(() => {
+    document.title = studioName ? `${studioName} — ${BRAND.product}` : BRAND.full
+  }, [studioName])
 
   useHotkey('mod+k', () => openPalette(), { allowInInput: true })
   useHotkey('c', () => openQuickAdd('task'))
@@ -104,6 +118,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     document.getElementById('main')?.focus({ preventScroll: true })
   }, [location.pathname])
+
+  /* Setup owns the whole screen until it has been completed once. */
+  if (!onboarded) return <Onboarding />
 
   return (
     <div className="min-h-dvh bg-canvas">

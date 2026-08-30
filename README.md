@@ -1,10 +1,10 @@
-# CRM PLCBO
+# CRMO
 
 A creative relationship management workspace for a design studio — clients, projects,
 moodboards, deals, tasks, feedback and approvals in one place.
 
 Built to feel like a project studio rather than a corporate admin panel: a warm-grey
-canvas, soft panels, a single electric-lime accent, and a component language made
+canvas, soft panels, a single saturated accent, and a component language made
 almost entirely of pills.
 
 ## Running it
@@ -27,6 +27,21 @@ the browser and persists to `localStorage`.
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | `tsc --noEmit` |
 
+## Setup and customisation
+
+On first run, CRMO walks through four short steps: name the studio, introduce
+yourself, pick an accent and theme, and choose whether to start from the demo
+studio or an empty workspace. All of it is editable afterwards under
+**Settings → Account & studio**, and **Open setup** runs the flow again.
+
+This is a **local profile, not authentication.** There is no server, so there is
+no password and no sign-in — the workspace lives in this browser's local storage.
+
+The accent is the only chromatic decision in the product; everything else is warm
+grey and near-black. Five presets ship (lime, amber, coral, sky, iris), each
+defined once in `tokens.css` under a `[data-accent]` block for both themes, and
+each light enough to carry near-black text well above 4.5:1.
+
 ## Architecture
 
 ```
@@ -41,8 +56,8 @@ src/
     charts/             hand-drawn SVG chart primitives
     shell/              AppShell · CommandPalette · QuickAdd · Logo · nav
     common/             Img · records · PageHeader · FilterBar
-  features/             dashboard · projects · moodboard · contacts · deals
-                        tasks · activity · approvals · reports · settings
+  features/             onboarding · dashboard · projects · moodboard · contacts
+                        deals · tasks · activity · approvals · reports · settings
 ```
 
 **Stack.** Vite · React 19 · TypeScript · Tailwind v4 (CSS-first `@theme`) ·
@@ -54,7 +69,7 @@ A few decisions worth knowing about:
   totals, task buckets, workload and the dashboard's priority list are computed
   there and nowhere else.
 - **Charts are hand-drawn SVG,** not a charting library. The reference language —
-  diagonal-hatch fills, grey bars with one lime bar, a single lime callout pill —
+  diagonal-hatch fills, grey bars with one accent bar, a single accent callout pill —
   is not something a library will give you, and this is ~250 lines with no
   dependency.
 - **Never filter inside a zustand selector.** Returning a new array or object each
@@ -75,13 +90,13 @@ implemented so it behaves completely rather than being a dead end:
 | **Photography** | Curated Unsplash URLs, each checked to resolve. If one fails — offline, dead URL — `lib/art.ts` renders deterministic generated artwork seeded from the record id, so no image is ever broken. |
 | **Avatars** | `pravatar.cc`, falling back to tinted initials. |
 | **Email / calendar** | Activity entries are logged by hand through Quick add rather than synced from a provider. |
-| **Auth & permissions** | Roles are stored and enforced in the UI copy, not by a server. "View as" in Settings switches the current user. |
+| **Accounts & auth** | Setup creates a local profile in this browser. There is no server, no password and no sign-in. Roles are stored and reflected in the UI, not enforced by a backend; "View as" in Settings switches the current user. |
 | **Notifications** | Preferences are stored; nothing is actually delivered. |
 
 ## Accessibility
 
-- Lime is never foreground text on a light surface — only a background paired with
-  ink, a large fill, or a chart mark. Muted ink clears 4.5:1 on canvas in both themes.
+- The accent is never foreground text on a light surface — only a background paired
+  with ink, a large fill, or a chart mark. Muted ink clears 4.5:1 on canvas in both themes.
 - Every icon-only control has an accessible name; there are no unlabelled focusables.
 - Every drag has a keyboard equivalent: dnd-kit's keyboard sensor on the handle,
   plus a "move to…" menu on every draggable card.

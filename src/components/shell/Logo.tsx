@@ -1,5 +1,6 @@
 import { BRAND } from '@/lib/brand'
 import { cn } from '@/lib/utils'
+import { useStore } from '@/store/useStore'
 
 /**
  * The mark: a capsule, tilted. The whole interface is built from pills, so the
@@ -28,14 +29,22 @@ export function Logo({ size = 40, className }: { size?: number; className?: stri
   )
 }
 
-/** Full lockup for the settings header and the command palette footer. */
+/**
+ * Full lockup. Shows the *workspace's* name — the studio using CRMO — with the
+ * product name kept as the quiet second line.
+ */
 export function Wordmark({ className }: { className?: string }) {
+  const workspace = useStore((s) => s.settings.workspace)
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <Logo size={30} />
       <span className="leading-none">
-        <span className="block text-lg font-medium tracking-title">{BRAND.full}</span>
-        <span className="mt-0.5 block text-xs text-ink-muted">{BRAND.tagline}</span>
+        <span className="block text-lg font-medium tracking-title">
+          {workspace.name || BRAND.workspace}
+        </span>
+        <span className="mt-0.5 block text-xs text-ink-muted">
+          {workspace.tagline || BRAND.tagline} · {BRAND.product}
+        </span>
       </span>
     </span>
   )

@@ -1,5 +1,5 @@
 /* ============================================================================
-   CRM PLCBO — DOMAIN MODEL
+   CRMO — DOMAIN MODEL
    Records reference each other by id only. Every derived figure (health,
    pipeline totals, workload) is computed in store/selectors.ts, never stored.
    ========================================================================== */
@@ -362,11 +362,35 @@ export interface SavedView {
   layout?: string
 }
 
+/** The five accent presets. Each is a background colour that carries ink text. */
+export type Accent = 'lime' | 'amber' | 'coral' | 'sky' | 'iris'
+
+/**
+ * The workspace's own identity, set during setup and editable in Settings.
+ * This is a local profile, not an authenticated account — there is no server
+ * and no password; see the README.
+ */
+export interface Workspace {
+  /** Studio name, shown in the nav, settings and page copy. */
+  name: string
+  tagline: string
+  /** The person using the app. Maps onto their TeamMember record. */
+  ownerName: string
+  ownerRole: string
+  ownerEmail: string
+  accent: Accent
+  currency: string
+  locale: string
+  /** False until setup has been completed once. */
+  onboarded: boolean
+}
+
 export interface Settings {
   theme: 'light' | 'dark' | 'system'
   density: 'comfortable' | 'compact'
   notifications: NotificationPrefs
   currentUserId: ID
+  workspace: Workspace
 }
 
 /* ------------------------------------------------------- ui view state --- */

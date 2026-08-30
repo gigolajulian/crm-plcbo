@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================================
-   CRM PLCBO — DESIGN TOKENS
+   CRMO — DESIGN TOKENS
    Derived from the studio references: warm-neutral canvas, soft off-white
    panels, near-black ink, a single electric lime accent, pill geometry.
    ========================================================================== */
@@ -31,11 +31,21 @@
   --color-line-soft: #e2e2df;
   --color-line-strong: #c2c2bd;
 
-  /* --- Accent: lime. Background-only, always paired with ink ------------- */
-  --color-lime: #c7f33c;
-  --color-lime-deep: #b2dd2a; /* hover / pressed */
-  --color-lime-pale: #e1f2ae;
-  --color-lime-wash: #eff8d5;
+  /* --- Accent -----------------------------------------------------------
+     One saturated accent, used as a *background* with ink on top — never as
+     foreground text on a light surface. Lime is the studio default; the
+     workspace can swap it (see the [data-accent] blocks below). The lime-*
+     names are kept as aliases so components never need to know which accent
+     is active. */
+  --color-accent: #c7f33c;
+  --color-accent-deep: #b2dd2a; /* hover / pressed */
+  --color-accent-pale: #e1f2ae;
+  --color-accent-wash: #eff8d5;
+
+  --color-lime: var(--color-accent);
+  --color-lime-deep: var(--color-accent-deep);
+  --color-lime-pale: var(--color-accent-pale);
+  --color-lime-wash: var(--color-accent-wash);
 
   /* --- Semantic status (muted, so lime stays the loudest thing on screen) */
   --color-positive: #2f7d4f;
@@ -103,7 +113,7 @@
   --shadow-lg: 0 4px 10px -4px rgb(10 10 10 / 0.07), 0 24px 56px -20px rgb(10 10 10 / 0.14);
   --shadow-xl: 0 8px 20px -8px rgb(10 10 10 / 0.1), 0 40px 90px -30px rgb(10 10 10 / 0.2);
   --shadow-lift: 0 10px 24px -10px rgb(10 10 10 / 0.14), 0 32px 64px -28px rgb(10 10 10 / 0.18);
-  --shadow-glow-lime: 0 0 0 1px rgb(199 243 60 / 0.5), 0 8px 30px -8px rgb(199 243 60 / 0.55);
+  --shadow-glow-lime: 0 0 0 1px var(--color-accent), 0 8px 26px -10px var(--color-accent);
 
   /* --- Motion: restrained ----------------------------------------------- */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -142,10 +152,10 @@
   --color-line-soft: #232321;
   --color-line-strong: #3d3d39;
 
-  --color-lime: #c7f33c;
-  --color-lime-deep: #d5ff5c;
-  --color-lime-pale: #3d4a1c;
-  --color-lime-wash: #23280f;
+  /* Dark keeps the accent saturated; only its tints invert. */
+  --color-accent-deep: #d5ff5c;
+  --color-accent-pale: #3d4a1c;
+  --color-accent-wash: #23280f;
 
   --color-positive: #6cc48c;
   --color-positive-wash: #17301f;
@@ -162,4 +172,59 @@
   --shadow-lg: 0 4px 10px -4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.6);
   --shadow-xl: 0 8px 20px -8px rgb(0 0 0 / 0.5), 0 40px 90px -30px rgb(0 0 0 / 0.7);
   --shadow-lift: 0 10px 24px -10px rgb(0 0 0 / 0.6), 0 32px 64px -28px rgb(0 0 0 / 0.7);
+}
+
+/* ============================================================================
+   ACCENT PRESETS
+   Chosen during setup and changeable in Settings. Every option is light and
+   saturated enough that near-black text sits on it at well over 4.5:1, which
+   is the rule the whole accent role depends on.
+   ========================================================================== */
+
+:root[data-accent='amber'] {
+  --color-accent: #ffc53d;
+  --color-accent-deep: #f0b222;
+  --color-accent-pale: #fce7b5;
+  --color-accent-wash: #fdf3dc;
+}
+.dark:root[data-accent='amber'] {
+  --color-accent-deep: #ffd76e;
+  --color-accent-pale: #4a3a12;
+  --color-accent-wash: #2b210a;
+}
+
+:root[data-accent='coral'] {
+  --color-accent: #ff8a6b;
+  --color-accent-deep: #f5734f;
+  --color-accent-pale: #ffd6c9;
+  --color-accent-wash: #ffebe4;
+}
+.dark:root[data-accent='coral'] {
+  --color-accent-deep: #ffa78e;
+  --color-accent-pale: #4e2418;
+  --color-accent-wash: #2e150e;
+}
+
+:root[data-accent='sky'] {
+  --color-accent: #7fd4ff;
+  --color-accent-deep: #5fc4f5;
+  --color-accent-pale: #c8eafc;
+  --color-accent-wash: #e4f5fe;
+}
+.dark:root[data-accent='sky'] {
+  --color-accent-deep: #a3e2ff;
+  --color-accent-pale: #143845;
+  --color-accent-wash: #0d242c;
+}
+
+:root[data-accent='iris'] {
+  --color-accent: #c3b4ff;
+  --color-accent-deep: #ac99f7;
+  --color-accent-pale: #e0d9ff;
+  --color-accent-wash: #f0ecff;
+}
+.dark:root[data-accent='iris'] {
+  --color-accent-deep: #d4c9ff;
+  --color-accent-pale: #2e2652;
+  --color-accent-wash: #1c1733;
 }

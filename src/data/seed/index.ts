@@ -77,10 +77,72 @@ export function createSeedDatabase(): Database {
       density: 'comfortable',
       notifications,
       currentUserId: CURRENT_USER_ID,
+      workspace: DEFAULT_WORKSPACE,
     },
   }
 
   return structuredClone(db)
+}
+
+export const DEFAULT_WORKSPACE = {
+  name: 'PLCBO',
+  tagline: 'Creative relationship management',
+  ownerName: 'Ivy Marchetti',
+  ownerRole: 'Founder & Creative Director',
+  ownerEmail: 'ivy@plcbo.studio',
+  accent: 'lime' as const,
+  currency: 'USD',
+  locale: 'en-US',
+  onboarded: false,
+}
+
+/**
+ * An empty workspace: the studio's own identity and settings, but none of the
+ * demo clients or work. Used when someone chooses to start from scratch.
+ */
+export function createEmptyDatabase(workspace: Database['settings']['workspace']): Database {
+  const seed = createSeedDatabase()
+  const ownerId = 'tm_owner'
+
+  return {
+    team: [
+      {
+        id: ownerId,
+        name: workspace.ownerName || 'You',
+        role: workspace.ownerRole || 'Founder',
+        permissionRole: 'owner',
+        email: workspace.ownerEmail || 'you@studio.com',
+        capacity: 40,
+        active: true,
+      },
+    ],
+    companies: [],
+    contacts: [],
+    projects: [],
+    milestones: [],
+    tasks: [],
+    deals: [],
+    // Pipelines, tags and custom fields are scaffolding worth keeping — an
+    // empty workspace with no stages cannot do anything at all.
+    pipeline: seed.pipeline,
+    moodboards: [],
+    moodSections: [],
+    moodItems: [],
+    assets: [],
+    assetVersions: [],
+    comments: [],
+    activity: [],
+    tags: seed.tags,
+    customFields: [],
+    savedViews: [],
+    settings: {
+      theme: seed.settings.theme,
+      density: 'comfortable',
+      notifications: seed.settings.notifications,
+      currentUserId: ownerId,
+      workspace,
+    },
+  }
 }
 
 export { CURRENT_USER_ID }

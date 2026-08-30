@@ -1,9 +1,9 @@
 {
-  "name": "crm-plcbo",
+  "name": "crmo",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "CRM PLCBO — creative relationship management for a studio.",
+  "description": "CRMO — creative relationship management for a studio.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -21,11 +21,12 @@ import type {
   Settings,
   Tag,
   Task,
+  Workspace,
 } from '@/data/types'
-import { createSeedDatabase } from '@/data/seed'
+import { createEmptyDatabase, createSeedDatabase } from '@/data/seed'
 import { arrayMove, toISODate, uid } from '@/lib/utils'
 
-const STORAGE_KEY = 'crm-plcbo/v1'
+const STORAGE_KEY = 'crmo/v1'
 
 /* ------------------------------------------------------------------------ */
 
@@ -101,6 +102,10 @@ type Actions = {
   removeTeamMember: (id: ID) => void
   saveView: (view: Omit<SavedView, 'id'>) => ID
   deleteView: (id: ID) => void
+
+  /* workspace setup */
+  updateWorkspace: (patch: Partial<Workspace>) => void
+  completeSetup: (workspace: Partial<Workspace>, start: 'demo' | 'empty') => void
 
   resetDemoData: () => void
 }
@@ -679,11 +684,46 @@ export const useStore = create<Store>()(
       },
       deleteView: (id) => set((s) => ({ savedViews: s.savedViews.filter((v) => v.id !== id) })),
 
+      /* -------------------------------------------------------- workspace */
+
+      updateWorkspace: (patch) =>
+        set((s) => ({
+          settings: { ...s.settings, workspace: { ...s.settings.workspace, ...patch } },
+        })),
+
+      completeSetup: (patch, start) => {
+        const workspace = { ...get().settings.workspace, ...patch, onboarded: true }
+
+        if (start === 'empty') {
+          set(createEmptyDatabase(workspace))
+          return
+        }
+
+        // Keeping the demo studio: rename the owner's own team record so the
+        // workspace reads as theirs rather than as somebody else's.
+        set((s) => ({
+          team: s.team.map((m) =>
+            m.id === s.settings.currentUserId
+              ? {
+                  ...m,
+                  name: workspace.ownerName || m.name,
+                  role: workspace.ownerRole || m.role,
+                  email: workspace.ownerEmail || m.email,
+                }
+              : m,
+          ),
+          settings: { ...s.settings, workspace },
+        }))
+      },
+
       resetDemoData: () => {
         const fresh = createSeedDatabase()
-        // Preserve the chosen theme across a reset — it is a preference, not data.
-        const theme = get().settings.theme
-        set({ ...fresh, settings: { ...fresh.settings, theme } })
+        // Theme and workspace identity are preferences, not demo data.
+        const { theme, workspace } = get().settings
+        set({
+          ...fresh,
+          settings: { ...fresh.settings, theme, workspace },
+        })
       },
     }),
     {

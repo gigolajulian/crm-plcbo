@@ -1,17 +1,18 @@
 /**
- * Everything brand-specific lives here so the product can be renamed in one place.
- * The pill/capsule motif is deliberate: the entire component language is built
- * from pills, so the mark and the UI share a single idea.
+ * The product's own identity.
+ *
+ * Distinct from the *workspace* identity in `settings.workspace`, which is the
+ * studio using the app and is set during setup. CRMO is the tool; the workspace
+ * is whoever's studio it is.
  */
 export const BRAND = {
-  studio: 'PLCBO',
-  product: 'CRM',
-  full: 'CRM PLCBO',
-  /** Used where only one word fits — the rail, the mobile header. */
-  short: 'PLCBO',
+  /** The application name. */
+  full: 'CRMO',
+  product: 'CRMO',
+  short: 'CRMO',
   tagline: 'Creative relationship management',
-  /** Shown in the workspace switcher. */
-  workspace: 'PLCBO Studio',
+  /** Fallback workspace label before setup names one. */
+  workspace: 'Your studio',
   currency: 'USD',
   locale: 'en-US',
 } as const
