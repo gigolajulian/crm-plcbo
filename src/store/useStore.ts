@@ -26,6 +26,7 @@ import type {
 import { createEmptyDatabase, createSeedDatabase } from '@/data/seed'
 import { arrayMove, toISODate, uid } from '@/lib/utils'
 import { setMoneyFormat } from '@/lib/intl'
+import { generatePortrait } from '@/lib/art'
 
 const STORAGE_KEY = 'crmo/v1'
 
@@ -802,7 +803,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: STORAGE_KEY,
-      version: 2,
+      version: 3,
       // Actions are recreated on every load; only the data is persisted.
       partialize: (state) =>
         Object.fromEntries(
@@ -838,8 +839,33 @@ export const useStore = create<Store>()(
         }
       },
 
-      // `merge` repairs any shape, so migrating is just a version bump.
-      migrate: (persisted) => persisted as Database,
+      /*
+       * v3 removes the third-party avatar service. Anyone still holding one of
+       * its URLs gets a locally drawn portrait instead — except the signed-in
+       * user, who is cleared to initials, because inheriting a demo character's
+       * face as your own was never right and a real upload should replace it.
+       */
+      migrate: (persisted) => {
+        const state = persisted as Database | undefined
+        if (!state?.team) return state as Database
+
+        const isService = (url?: string) => Boolean(url && url.includes('pravatar.cc'))
+        const meId = state.settings?.currentUserId
+
+        return {
+          ...state,
+          team: state.team.map((member) =>
+            isService(member.avatar)
+              ? { ...member, avatar: member.id === meId ? undefined : generatePortrait(member.id) }
+              : member,
+          ),
+          contacts: (state.contacts ?? []).map((contact) =>
+            isService(contact.avatar)
+              ? { ...contact, avatar: generatePortrait(contact.id) }
+              : contact,
+          ),
+        }
+      },
     },
   ),
 )

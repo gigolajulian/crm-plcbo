@@ -172,3 +172,44 @@ export function avatarTint(seed: string): { bg: string; fg: string } {
   ]
   return tints[hashCode(seed) % tints.length]
 }
+
+/* ============================================================================
+   GENERATED PORTRAITS
+
+   The demo studio used to point at a third-party avatar service. That made a
+   person's face depend on someone else's uptime, which is a silly thing for a
+   CRM to be fragile about. These are drawn locally from the same seed the rest
+   of the identity system uses, so they cannot 404, work offline, and stay
+   stable for a given person forever.
+
+   A real uploaded picture always wins over one of these.
+   ========================================================================== */
+
+/** Deterministic abstract portrait: a figure in the studio palette. */
+export function generatePortrait(seed: string): string {
+  const rand = seededRandom(`${seed}-portrait`)
+  const palette = PALETTES[hashCode(`${seed}-p`) % PALETTES.length]
+  const size = 256
+
+  // Head sits slightly above centre, shoulders run off the bottom edge.
+  const cx = size / 2 + (rand() - 0.5) * 14
+  const headR = size * (0.19 + rand() * 0.04)
+  const headY = size * (0.38 + rand() * 0.03)
+  const shoulderR = size * (0.34 + rand() * 0.06)
+  const shoulderY = headY + headR + shoulderR * 0.62
+
+  // One accent shape behind the figure keeps them from reading as identical.
+  const arcR = size * (0.3 + rand() * 0.22)
+  const arcX = rand() * size
+  const arcY = rand() * size * 0.6
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+    <rect width="${size}" height="${size}" fill="${palette.bg}"/>
+    <circle cx="${arcX.toFixed(1)}" cy="${arcY.toFixed(1)}" r="${arcR.toFixed(1)}" fill="${palette.accent}" opacity="0.32"/>
+    <circle cx="${cx.toFixed(1)}" cy="${shoulderY.toFixed(1)}" r="${shoulderR.toFixed(1)}" fill="${palette.ink}" opacity="0.9"/>
+    <circle cx="${cx.toFixed(1)}" cy="${headY.toFixed(1)}" r="${headR.toFixed(1)}" fill="${palette.ink}" opacity="0.9"/>
+    <circle cx="${(cx - headR * 0.32).toFixed(1)}" cy="${(headY - headR * 0.3).toFixed(1)}" r="${(headR * 0.28).toFixed(1)}" fill="${palette.bg}" opacity="0.18"/>
+  </svg>`
+
+  return esc(svg)
+}

@@ -1,3 +1,5 @@
+import { generatePortrait } from '@/lib/art'
+
 /**
  * Curated photography.
  *
@@ -140,9 +142,10 @@ export function fromSet(set: PhotoSet, index: number, preset: Preset = 'card'): 
 }
 
 /**
- * Portraits. Uses the `pravatar` avatar service, which returns a stable face
- * for a given id — the `Avatar` component falls back to tinted initials.
+ * Portraits for the demo studio. Drawn locally rather than fetched, so no
+ * person's face depends on a third-party service being up. A real uploaded
+ * picture always takes precedence.
  */
 export function portrait(seed: number): string {
-  return `https://i.pravatar.cc/240?img=${seed}`
+  return generatePortrait(`person-${seed}`)
 }
