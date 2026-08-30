@@ -138,7 +138,7 @@ implemented so it behaves completely rather than being a dead end:
 | **Persistence** | Local mode uses `localStorage`; connected mode uses Postgres. Both survive a reload. |
 | **File upload** | Still the curated photo library rather than a file dialog. The storage bucket and `storage_path` column exist; wiring the picker to them is the remaining step. |
 | **Photography** | Curated Unsplash URLs, each checked to resolve. If one fails — offline, dead URL — `lib/art.ts` renders deterministic generated artwork seeded from the record id, so no image is ever broken. |
-| **Avatars** | `pravatar.cc`, falling back to tinted initials. |
+| **Avatars** | Your own picture uploads for real — centre-cropped to 256px and stored as a small WebP data URL, so it works in both modes and survives a reload. The demo characters use `pravatar.cc`; anyone without a picture gets tinted initials. |
 | **Email / calendar** | Activity entries are logged by hand through Quick add rather than synced from a provider. |
 | **Accounts & auth** | Local mode has no sign-in — setup creates a browser-local profile. Connected mode uses real Supabase auth. Roles are reflected in the UI but only RLS enforces tenancy; per-role write rules are next. |
 | **Notifications** | Preferences are stored; nothing is actually delivered. |

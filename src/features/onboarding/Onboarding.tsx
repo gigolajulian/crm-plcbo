@@ -7,6 +7,7 @@ import { CURRENCIES, LOCALES, setMoneyFormat } from '@/lib/intl'
 import { Button, Card, IconButton, Pill } from '@/components/ui/primitives'
 import { Input, Select } from '@/components/ui/form'
 import { Logo } from '@/components/shell/Logo'
+import { AvatarUpload } from '@/components/common/AvatarUpload'
 import { ACCENTS } from './accents'
 import { PIPELINE_TEMPLATES, SERVICE_TAGS, buildPipeline } from './pipelines'
 
@@ -27,6 +28,8 @@ export interface SetupResult {
   ownerName: string
   ownerRole: string
   ownerEmail: string
+  /** Data URL, or undefined to keep tinted initials. */
+  ownerAvatar?: string
   accent: Accent
   currency: string
   locale: string
@@ -59,6 +62,7 @@ export function Onboarding({
   const [ownerName, setOwnerName] = useState('')
   const [ownerRole, setOwnerRole] = useState('')
   const [ownerEmail, setOwnerEmail] = useState(defaultEmail ?? '')
+  const [ownerAvatar, setOwnerAvatar] = useState<string | undefined>(undefined)
 
   const [currency, setCurrency] = useState(guessCurrency())
   const [locale, setLocale] = useState(guessLocale())
@@ -106,6 +110,7 @@ export function Onboarding({
       ownerName: ownerName.trim(),
       ownerRole: ownerRole.trim() || 'Founder',
       ownerEmail: ownerEmail.trim(),
+      ownerAvatar,
       accent,
       currency,
       locale,
@@ -136,6 +141,7 @@ export function Onboarding({
         ownerName: result.ownerName,
         ownerRole: result.ownerRole,
         ownerEmail: result.ownerEmail,
+        ownerAvatar: result.ownerAvatar,
         accent: result.accent,
         currency: result.currency,
         locale: result.locale,
@@ -227,6 +233,16 @@ export function Onboarding({
                   onChange={(e) => setOwnerEmail(e.target.value)}
                 />
               </div>
+
+              <fieldset>
+                <legend className="eyebrow mb-3">Profile picture</legend>
+                <AvatarUpload
+                  name={ownerName}
+                  value={ownerAvatar}
+                  onChange={setOwnerAvatar}
+                  hint="Optional. Without one you get your initials, which is a perfectly good look."
+                />
+              </fieldset>
             </Section>
           )}
 

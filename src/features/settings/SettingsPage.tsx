@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   Bell,
+  Eraser,
   GripVertical,
   Monitor,
   Moon,
@@ -31,6 +32,7 @@ import { Wordmark } from '@/components/shell/Logo'
 import { ACCENTS } from '@/features/onboarding/accents'
 import { CURRENCIES, LOCALES } from '@/lib/intl'
 import { StorageModeBadge } from '@/features/auth/AuthGate'
+import { AvatarUpload } from '@/components/common/AvatarUpload'
 
 /* ============================================================================
    SETTINGS
@@ -45,7 +47,7 @@ const SECTIONS = [
   { id: 'pipeline', label: 'Pipeline', icon: Workflow },
   { id: 'tags', label: 'Tags & fields', icon: Tags },
   { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'data', label: 'Demo data', icon: RotateCcw },
+  { id: 'data', label: 'Data', icon: RotateCcw },
 ] as const
 
 type Section = (typeof SECTIONS)[number]['id']
@@ -122,6 +124,7 @@ function AccountSettings() {
   const [email, setEmail] = useState(workspace.ownerEmail)
   const [currency, setCurrency] = useState(workspace.currency)
   const [locale, setLocale] = useState(workspace.locale)
+  const [avatar, setAvatar] = useState<string | undefined>(me?.avatar ?? workspace.ownerAvatar)
   const [rerun, setRerun] = useState(false)
 
   const dirty =
@@ -131,7 +134,8 @@ function AccountSettings() {
     role !== workspace.ownerRole ||
     email !== workspace.ownerEmail ||
     currency !== workspace.currency ||
-    locale !== workspace.locale
+    locale !== workspace.locale ||
+    avatar !== (me?.avatar ?? workspace.ownerAvatar)
 
   function save() {
     updateWorkspace({
@@ -142,12 +146,14 @@ function AccountSettings() {
       ownerEmail: email.trim(),
       currency,
       locale,
+      ownerAvatar: avatar,
     })
     // The owner's profile and their team record are the same person.
     updateTeamMember(currentUserId, {
       name: name.trim() || workspace.ownerName,
       role: role.trim() || me?.role,
       email: email.trim() || me?.email,
+      avatar,
     })
     toast.success('Saved')
   }
@@ -179,8 +185,14 @@ function AccountSettings() {
           description="Your profile in the studio — the person work is assigned to and decisions are recorded against."
           className="mt-8"
         />
+        <AvatarUpload
+          name={name || me?.name || 'You'}
+          value={avatar}
+          onChange={setAvatar}
+          className="mb-5"
+          hint="Optional. Without one you get your initials."
+        />
         <div className="flex items-start gap-4">
-          {me && <Avatar name={me.name} src={me.avatar} size="xl" />}
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Your name" value={name} onChange={(e) => setName(e.target.value)} />
             <Input label="Your role" value={role} onChange={(e) => setRole(e.target.value)} />
@@ -904,6 +916,7 @@ function NotificationSettings() {
 
 function DataSettings() {
   const resetDemoData = useStore((s) => s.resetDemoData)
+  const clearDemoData = useStore((s) => s.clearDemoData)
   // Each count is selected as a primitive: returning an object from a zustand
   // selector creates a new reference every render and loops forever.
   const counts = {
@@ -915,6 +928,7 @@ function DataSettings() {
     activity: useStore((s) => s.activity.length),
   }
   const [confirming, setConfirming] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   return (
     <div className="flex flex-col gap-5">
@@ -933,19 +947,50 @@ function DataSettings() {
         </dl>
       </Card>
 
-      <Card variant="surface" padding="lg" radius="2xl">
+      {/* The common case: keep the studio you set up, drop the sample records. */}
+      <Card variant="raised" padding="lg" radius="2xl">
         <SectionHeading
-          title="Reset demo data"
-          description="Restores the original studio, its clients, projects and moodboards. Your theme is kept."
+          title="Clear the demo data"
+          description="Start working for real, without setting the workspace up again."
         />
         <p className="mb-4 max-w-prose text-sm text-pretty text-ink-muted">
-          Everything you have created, edited or deleted in this workspace will be replaced with the
-          original demo dataset. This cannot be undone.
+          Removes the sample clients, projects, moodboards, deals, tasks and history, and everyone
+          on the roster except you. Keeps your studio details, your profile, your pipeline stages
+          and your tags — everything you chose at setup.
+        </p>
+        <Button variant="primary" icon={<Eraser size={15} />} onClick={() => setClearing(true)}>
+          Clear demo data
+        </Button>
+      </Card>
+
+      <Card variant="surface" padding="lg" radius="2xl">
+        <SectionHeading
+          title="Reset to the demo studio"
+          description="The opposite: put the sample workspace back the way it started."
+        />
+        <p className="mb-4 max-w-prose text-sm text-pretty text-ink-muted">
+          Everything you have created, edited or deleted is replaced with the original demo
+          dataset. Your theme and studio identity are kept. This cannot be undone.
         </p>
         <Button variant="danger" icon={<RotateCcw size={15} />} onClick={() => setConfirming(true)}>
           Reset to the demo studio
         </Button>
       </Card>
+
+      <ConfirmDialog
+        open={clearing}
+        onClose={() => setClearing(false)}
+        title="Clear the demo data?"
+        body="The sample clients, projects, moodboards, deals and history are removed. Your studio, profile, pipeline and tags stay exactly as they are. This cannot be undone."
+        confirmLabel="Clear it"
+        destructive
+        onConfirm={() => {
+          clearDemoData()
+          toast.success('Demo data cleared', {
+            detail: 'Your studio, pipeline and tags are untouched.',
+          })
+        }}
+      />
 
       <ConfirmDialog
         open={confirming}

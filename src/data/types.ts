@@ -378,6 +378,8 @@ export interface Workspace {
   ownerName: string
   ownerRole: string
   ownerEmail: string
+  /** Small square data URL. Undefined means tinted initials. */
+  ownerAvatar?: string
   accent: Accent
   currency: string
   locale: string

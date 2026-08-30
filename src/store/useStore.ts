@@ -110,6 +110,7 @@ type Actions = {
   completeSetup: (workspace: Partial<Workspace>, start: 'demo' | 'empty') => void
 
   resetDemoData: () => void
+  clearDemoData: () => void
 }
 
 export type Store = Database & Actions
@@ -724,6 +725,9 @@ export const useStore = create<Store>()(
                     name: workspace.ownerName || m.name,
                     role: workspace.ownerRole || m.role,
                     email: workspace.ownerEmail || m.email,
+                    // Their own picture, or none — never the demo character's
+                    // stock portrait standing in for a real person.
+                    avatar: workspace.ownerAvatar,
                   }
                 : m,
             ),
@@ -750,6 +754,39 @@ export const useStore = create<Store>()(
           return {
             pipeline: result.pipeline,
             tags: result.tags.length > 0 ? result.tags : s.tags,
+          }
+        }),
+
+
+      /**
+       * Empty the workspace of records without touching how it is configured.
+       *
+       * Keeps the studio identity, your own profile, the pipeline you chose,
+       * your tags and custom fields — the answers you gave at setup. Removes
+       * the demo clients, work, moodboards, approvals and history, and anyone
+       * on the roster who is not you. Connected mode syncs the deletions.
+       */
+      clearDemoData: () =>
+        set((s) => {
+          const me =
+            s.team.find((m) => m.id === s.settings.currentUserId) ?? s.team[0]
+
+          return {
+            team: me ? [me] : [],
+            companies: [],
+            contacts: [],
+            projects: [],
+            milestones: [],
+            tasks: [],
+            deals: [],
+            moodboards: [],
+            moodSections: [],
+            moodItems: [],
+            assets: [],
+            assetVersions: [],
+            comments: [],
+            activity: [],
+            savedViews: [],
           }
         }),
 
