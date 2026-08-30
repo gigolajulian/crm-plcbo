@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, type ReactNode } from 'react'
 import { Link, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/shell/AppShell'
+import { AuthGate } from '@/features/auth/AuthGate'
 import { Button, ButtonLink, Skeleton } from '@/components/ui/primitives'
 import { ErrorState } from '@/components/ui/feedback'
 
@@ -22,6 +23,7 @@ const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 
 export default function App() {
   return (
+    <AuthGate>
     <AppShell>
       <ErrorBoundary>
         <Suspense fallback={<RouteSkeleton />}>
@@ -46,6 +48,7 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
     </AppShell>
+    </AuthGate>
   )
 }
 
