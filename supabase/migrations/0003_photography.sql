@@ -150,17 +150,35 @@ create index if not exists invoices_shoot_idx on public.invoices (workspace_id, 
 
 -- Stages now span the whole lifecycle, not just open/won/lost.
 --
--- Existing rows have to be moved onto the new vocabulary *before* the check is
--- reinstated, or the constraint is rejected by the data already in the table.
--- 'open' was a sales stage, so it lands on 'quoted'; won and lost carry over
--- unchanged. The client replaces the whole pipeline on its next sync anyway —
--- this is only here so the constraint has something valid to apply to.
-alter table public.pipeline_stages drop constraint if exists pipeline_stages_kind_check;
+-- Existing rows must be moved onto the new vocabulary *before* the check is
+-- reinstated, or Postgres validates the new constraint against the old data and
+-- refuses it. 'open' was a sales stage, so it lands on 'quoted'; won and lost
+-- carry over unchanged. The client replaces the whole pipeline on its next sync
+-- anyway — this only has to be valid enough for the constraint to attach.
+--
+-- The old check is dropped by looking up its real name rather than assuming it,
+-- because a constraint created inline with the table may carry a generated one.
+do $$
+declare c text;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'public.pipeline_stages'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%kind%'
+  loop
+    execute format('alter table public.pipeline_stages drop constraint %I', c);
+  end loop;
+end $$;
 
+-- Unconditional: every row is rewritten to a known-valid value, so nothing can
+-- be left behind for the new constraint to reject.
 update public.pipeline_stages
-   set kind = 'quoted'
- where kind not in ('lead', 'quoted', 'booked', 'production', 'delivered',
-                    'licensing', 'won', 'lost');
+   set kind = case
+     when kind = 'won'  then 'won'
+     when kind = 'lost' then 'lost'
+     else 'quoted'
+   end;
 
 alter table public.pipeline_stages add constraint pipeline_stages_kind_check
   check (kind in ('lead', 'quoted', 'booked', 'production', 'delivered',
