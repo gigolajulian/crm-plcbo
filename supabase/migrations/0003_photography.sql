@@ -149,7 +149,19 @@ create index if not exists invoices_shoot_idx on public.invoices (workspace_id, 
 -- ------------------------------------------------- widen existing columns
 
 -- Stages now span the whole lifecycle, not just open/won/lost.
+--
+-- Existing rows have to be moved onto the new vocabulary *before* the check is
+-- reinstated, or the constraint is rejected by the data already in the table.
+-- 'open' was a sales stage, so it lands on 'quoted'; won and lost carry over
+-- unchanged. The client replaces the whole pipeline on its next sync anyway —
+-- this is only here so the constraint has something valid to apply to.
 alter table public.pipeline_stages drop constraint if exists pipeline_stages_kind_check;
+
+update public.pipeline_stages
+   set kind = 'quoted'
+ where kind not in ('lead', 'quoted', 'booked', 'production', 'delivered',
+                    'licensing', 'won', 'lost');
+
 alter table public.pipeline_stages add constraint pipeline_stages_kind_check
   check (kind in ('lead', 'quoted', 'booked', 'production', 'delivered',
                   'licensing', 'won', 'lost'));
