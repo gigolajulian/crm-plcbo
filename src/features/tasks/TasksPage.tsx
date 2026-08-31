@@ -29,7 +29,7 @@ export default function TasksPage() {
   const buckets = useTaskBuckets(mineOnly)
   const allBuckets = useTaskBuckets(false)
   const team = useActiveTeam()
-  const projects = useStore((s) => s.projects)
+  const shoots = useStore((s) => s.shoots)
   const addTask = useStore((s) => s.addTask)
   const toggleTask = useStore((s) => s.toggleTask)
   const deleteTask = useStore((s) => s.deleteTask)
@@ -57,7 +57,7 @@ export default function TasksPage() {
     if (!draft.trim()) return
     addTask({
       title: draft.trim(),
-      projectId: draftProject || undefined,
+      shootId: draftProject || undefined,
       dueDate:
         bucket === 'today' || bucket === 'overdue'
           ? new Date().toISOString().slice(0, 10)
@@ -153,12 +153,12 @@ export default function TasksPage() {
             <select
               value={draftProject}
               onChange={(e) => setDraftProject(e.target.value)}
-              aria-label="Link to a project"
+              aria-label="Link to a shoot"
               className="h-9 rounded-pill bg-surface px-3 text-sm text-ink-muted"
             >
-              <option value="">No project</option>
-              {projects
-                .filter((p) => p.stage !== 'complete')
+              <option value="">No shoot</option>
+              {shoots
+                .filter((p) => !p.archived)
                 .map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -302,9 +302,8 @@ export default function TasksPage() {
                       ) : (
                         <DueBadge date={task.dueDate} />
                       )}
-                      {task.projectId && <LinkedRecord kind="project" id={task.projectId} size="sm" />}
+                      {task.shootId && <LinkedRecord kind="shoot" id={task.shootId} size="sm" />}
                       {task.contactId && <LinkedRecord kind="contact" id={task.contactId} size="sm" />}
-                      {task.dealId && <LinkedRecord kind="deal" id={task.dealId} size="sm" />}
                       {task.reminderAt && (
                         <Pill tone="lime" size="sm">
                           Reminder {formatRelativeDay(task.reminderAt)}

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { CustomFieldType, PermissionRole, Tag } from '@/data/types'
 import { useStore } from '@/store/useStore'
+import { isClosed } from '@/data/pipeline'
 import { useActiveTeam } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/brand'
@@ -209,7 +210,7 @@ function AccountSettings() {
 
         <SectionHeading
           title="Money & region"
-          description="Every deal value, budget and revenue figure is shown in this currency, formatted for your region."
+          description="Every quote, invoice and revenue figure is shown in this currency, formatted for your region."
           className="mt-8"
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -563,27 +564,27 @@ function PipelineSettings() {
   const addPipelineStage = useStore((s) => s.addPipelineStage)
   const deletePipelineStage = useStore((s) => s.deletePipelineStage)
   const reorderPipeline = useStore((s) => s.reorderPipeline)
-  const deals = useStore((s) => s.deals)
+  const shoots = useStore((s) => s.shoots)
 
   const [newStage, setNewStage] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const sorted = [...pipeline].sort((a, b) => a.order - b.order)
-  const openStages = sorted.filter((s) => s.kind === 'open')
+  const openStages = sorted.filter((s) => !isClosed(s.kind))
 
   return (
     <div className="flex flex-col gap-5">
       <Card variant="raised" padding="lg" radius="3xl">
         <SectionHeading
-          title="Deal stages"
-          description="Rename, reorder, or add stages. Deals in a deleted stage move to the first one."
+          title="Lifecycle stages"
+          description="Rename, reorder, or add stages. Shoots in a deleted stage move to the first one."
         />
         <ul className="flex flex-col gap-2">
           {sorted.map((stage, index) => {
-            const count = deals.filter((d) => d.stageId === stage.id).length
-            const canMoveUp = stage.kind === 'open' && index > 0 && sorted[index - 1].kind === 'open'
+            const count = shoots.filter((d: { stageId: string }) => d.stageId === stage.id).length
+            const canMoveUp = !isClosed(stage.kind) && index > 0 && !isClosed(sorted[index - 1].kind)
             const canMoveDown =
-              stage.kind === 'open' && index < sorted.length - 1 && sorted[index + 1].kind === 'open'
+              !isClosed(stage.kind) && index < sorted.length - 1 && !isClosed(sorted[index + 1].kind)
 
             return (
               <li
@@ -610,7 +611,7 @@ function PipelineSettings() {
                     min={0}
                     max={100}
                     value={stage.probability}
-                    disabled={stage.kind !== 'open'}
+                    disabled={isClosed(stage.kind)}
                     onChange={(e) =>
                       updatePipelineStage(stage.id, { probability: Number(e.target.value) })
                     }
@@ -620,8 +621,8 @@ function PipelineSettings() {
                   %
                 </label>
 
-                <Pill tone={stage.kind === 'open' ? 'neutral' : stage.kind === 'won' ? 'positive' : 'critical'} size="sm">
-                  {count} {count === 1 ? 'deal' : 'deals'}
+                <Pill tone={!isClosed(stage.kind) ? 'neutral' : stage.kind === 'won' ? 'positive' : 'critical'} size="sm">
+                  {count} {count === 1 ? 'shoot' : 'shoots'}
                 </Pill>
 
                 <div className="flex items-center gap-1">
@@ -647,7 +648,7 @@ function PipelineSettings() {
                     label={`Delete ${stage.name}`}
                     size="sm"
                     variant="ghost"
-                    disabled={stage.kind !== 'open' || openStages.length <= 1}
+                    disabled={isClosed(stage.kind) || openStages.length <= 1}
                     onClick={() => setDeleting(stage.id)}
                   >
                     <Trash2 size={14} />
@@ -685,7 +686,7 @@ function PipelineSettings() {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
         title="Delete this stage?"
-        body="Any deals in it move to the first open stage. This cannot be undone."
+        body="Any shoots in it move to the first open stage. This cannot be undone."
         confirmLabel="Delete stage"
         destructive
         onConfirm={() => {
@@ -719,7 +720,7 @@ function TagSettings() {
         <SectionHeading
           title="Tags"
           count={tags.length}
-          description="Shared across projects, clients, companies and deals."
+          description="Shared across shoots, clients and companies."
         />
         <ul className="flex flex-wrap gap-2">
           {tags.map((tag) => (
@@ -855,9 +856,9 @@ function NotificationSettings() {
       description: 'When someone assigns work to you.',
     },
     {
-      key: 'dealStageChanges',
-      label: 'Deal stage changes',
-      description: 'When a deal you own moves forward or is lost.',
+      key: 'stageChanges',
+      label: 'Stage changes',
+      description: 'When a shoot you own moves along the lifecycle or is lost.',
     },
     {
       key: 'milestoneReminders',
@@ -920,9 +921,9 @@ function DataSettings() {
   // Each count is selected as a primitive: returning an object from a zustand
   // selector creates a new reference every render and loops forever.
   const counts = {
-    projects: useStore((s) => s.projects.length),
+    projects: useStore((s) => s.shoots.length),
     contacts: useStore((s) => s.contacts.length),
-    deals: useStore((s) => s.deals.length),
+    shoots: useStore((s) => s.shoots.length),
     tasks: useStore((s) => s.tasks.length),
     references: useStore((s) => s.moodItems.length),
     activity: useStore((s) => s.activity.length),
@@ -954,7 +955,7 @@ function DataSettings() {
           description="Start working for real, without setting the workspace up again."
         />
         <p className="mb-4 max-w-prose text-sm text-pretty text-ink-muted">
-          Removes the sample clients, projects, moodboards, deals, tasks and history, and everyone
+          Removes the sample clients, shoots, moodboards, invoices, licences, tasks and history, and everyone
           on the roster except you. Keeps your studio details, your profile, your pipeline stages
           and your tags — everything you chose at setup.
         </p>
@@ -981,7 +982,7 @@ function DataSettings() {
         open={clearing}
         onClose={() => setClearing(false)}
         title="Clear the demo data?"
-        body="The sample clients, projects, moodboards, deals and history are removed. Your studio, profile, pipeline and tags stay exactly as they are. This cannot be undone."
+        body="The sample clients, shoots, moodboards, invoices, licences and history are removed. Your studio, profile, pipeline and tags stay exactly as they are. This cannot be undone."
         confirmLabel="Clear it"
         destructive
         onConfirm={() => {

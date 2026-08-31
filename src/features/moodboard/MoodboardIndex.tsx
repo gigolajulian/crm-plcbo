@@ -21,13 +21,13 @@ export default function MoodboardIndex() {
   const [query, setQuery] = useState('')
   const boards = useStore((s) => s.moodboards)
   const items = useStore((s) => s.moodItems)
-  const projects = useStore((s) => s.projects)
+  const shoots = useStore((s) => s.shoots)
   const companies = useStore((s) => s.companies)
 
   const cards = useMemo(() => {
     const list = boards.map((board) => {
-      const project = projects.find((p) => p.id === board.projectId)
-      const company = companies.find((c) => c.id === project?.companyId)
+      const shoot = shoots.find((p) => p.id === board.shootId)
+      const company = companies.find((c) => c.id === shoot?.companyId)
       const boardItems = items.filter((i) => i.boardId === board.id)
       // Lead with pinned references — they are the ones people chose to hoist.
       const preview = sortBy(boardItems, (i) => (i.pinned ? 0 : 1)).filter(
@@ -35,7 +35,7 @@ export default function MoodboardIndex() {
       )
       return {
         board,
-        project,
+        shoot,
         company,
         count: boardItems.length,
         pinned: boardItems.filter((i) => i.pinned).length,
@@ -46,19 +46,19 @@ export default function MoodboardIndex() {
 
     const filtered = query
       ? list.filter((card) =>
-          matches(`${card.board.title} ${card.project?.name ?? ''} ${card.company?.name ?? ''}`, query),
+          matches(`${card.board.title} ${card.shoot?.name ?? ''} ${card.company?.name ?? ''}`, query),
         )
       : list
 
     return sortBy(filtered, (c) => c.board.updatedAt, -1)
-  }, [boards, items, projects, companies, query])
+  }, [boards, items, shoots, companies, query])
 
   return (
     <div className="animate-in">
       <PageHeader
         eyebrow="Inspiration"
         title="Moodboards"
-        description="Every reference the studio is holding on to, one board per project."
+        description="Every reference the studio is holding on to, one board per shoot."
         actions={
           <SearchInput
             value={query}
@@ -74,7 +74,7 @@ export default function MoodboardIndex() {
         <EmptyState
           icon={<Images size={20} />}
           title="No moodboards yet"
-          body="Every project gets one automatically. Start a project and the board comes with it."
+          body="Every shoot gets one automatically. Start a shoot and the board comes with it."
           size="lg"
         />
       ) : cards.length === 0 ? (
@@ -137,7 +137,7 @@ export default function MoodboardIndex() {
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-medium tracking-tight">
                       <Link
-                        to={`/projects/${card.board.projectId}?tab=moodboard`}
+                        to={`/shoots/${card.board.shootId}?tab=moodboard`}
                         className="after:absolute after:inset-0 after:content-['']"
                       >
                         {card.board.title}
@@ -167,9 +167,9 @@ export default function MoodboardIndex() {
                     <span className={cn('ml-auto')}>{formatRelativeTime(card.board.updatedAt)}</span>
                   </div>
 
-                  {card.project && (
+                  {card.shoot && (
                     <div className="relative z-10">
-                      <LinkedRecord kind="project" id={card.project.id} size="sm" />
+                      <LinkedRecord kind="shoot" id={card.shoot?.id} size="sm" />
                     </div>
                   )}
                 </div>

@@ -19,7 +19,10 @@ import { ActivityDot, LinkedRecord, SectionHeading } from '@/components/common/r
    and approvals, grouped by day, with the outstanding follow-ups pulled out.
    ========================================================================== */
 
-const TYPES: ActivityType[] = ['call', 'email', 'meeting', 'note', 'approval', 'status', 'deal', 'update']
+const TYPES: ActivityType[] = [
+  'call', 'email', 'meeting', 'note',
+  'approval', 'status', 'invoice', 'license', 'update',
+]
 
 export default function ActivityPage() {
   const [types, setTypes] = useState<ActivityType[]>([])
@@ -183,16 +186,13 @@ export default function ActivityPage() {
                                   {actor?.name ?? 'The studio'}
                                 </span>
                                 <span>{formatRelativeTime(event.at)}</span>
-                                {event.links.projectId && (
-                                  <LinkedRecord kind="project" id={event.links.projectId} size="sm" />
+                                {event.links.shootId && (
+                                  <LinkedRecord kind="shoot" id={event.links.shootId} size="sm" />
                                 )}
                                 {event.links.contactId && (
                                   <LinkedRecord kind="contact" id={event.links.contactId} size="sm" />
                                 )}
-                                {event.links.dealId && (
-                                  <LinkedRecord kind="deal" id={event.links.dealId} size="sm" />
-                                )}
-                              </div>
+                                                              </div>
                             </div>
 
                             {event.followUpAt && !event.followUpDone && (

@@ -1,5 +1,5 @@
 import { Component, Suspense, lazy, type ReactNode } from 'react'
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/shell/AppShell'
 import { AuthGate } from '@/features/auth/AuthGate'
 import { UpdateBanner } from '@/components/shell/UpdateBanner'
@@ -8,19 +8,29 @@ import { ErrorState } from '@/components/ui/feedback'
 
 /* Route-level code splitting keeps the first paint fast. */
 const Dashboard = lazy(() => import('@/features/dashboard/DashboardPage'))
-const ProjectsPage = lazy(() => import('@/features/projects/ProjectsPage'))
-const ProjectDetail = lazy(() => import('@/features/projects/ProjectDetail'))
+const ShootsPage = lazy(() => import('@/features/shoots/ShootsPage'))
+const ShootDetail = lazy(() => import('@/features/shoots/ShootDetail'))
 const MoodboardIndex = lazy(() => import('@/features/moodboard/MoodboardIndex'))
 const ContactsPage = lazy(() => import('@/features/contacts/ContactsPage'))
 const ContactDetail = lazy(() => import('@/features/contacts/ContactDetail'))
 const CompanyDetail = lazy(() => import('@/features/contacts/CompanyDetail'))
-const DealsPage = lazy(() => import('@/features/deals/DealsPage'))
-const DealDetail = lazy(() => import('@/features/deals/DealDetail'))
+const BillingPage = lazy(() => import('@/features/billing/BillingPage'))
+const LicencesPage = lazy(() => import('@/features/licences/LicencesPage'))
 const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
 const ActivityPage = lazy(() => import('@/features/activity/ActivityPage'))
 const ApprovalsPage = lazy(() => import('@/features/approvals/ApprovalsPage'))
 const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
+
+/**
+ * Deals and projects were folded into shoots. A project id is now a shoot id,
+ * and a deal id resolves through the migration, so old links keep working
+ * rather than dead-ending on a 404.
+ */
+function LegacyShootRedirect() {
+  const { id } = useParams()
+  return <Navigate to={id ? `/shoots/${id}` : '/shoots'} replace />
+}
 
 export default function App() {
   /*
@@ -36,15 +46,20 @@ export default function App() {
           <Suspense fallback={<RouteSkeleton />}>
             <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/shoots" element={<ShootsPage />} />
+            <Route path="/shoots/:id" element={<ShootDetail />} />
+            {/* Old links and bookmarks still resolve. */}
+            <Route path="/projects" element={<Navigate to="/shoots" replace />} />
+            <Route path="/projects/:id" element={<LegacyShootRedirect />} />
+            <Route path="/deals" element={<Navigate to="/shoots?view=board" replace />} />
+            <Route path="/deals/:id" element={<LegacyShootRedirect />} />
             <Route path="/moodboards" element={<MoodboardIndex />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/contacts/:id" element={<ContactDetail />} />
             <Route path="/companies" element={<ContactsPage />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
-            <Route path="/deals" element={<DealsPage />} />
-            <Route path="/deals/:id" element={<DealDetail />} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/licences" element={<LicencesPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />

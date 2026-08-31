@@ -4,14 +4,16 @@ import {
   contacts,
   CURRENT_USER_ID,
   customFields,
+  leadSources,
   notifications,
   pipeline,
   tags,
   team,
 } from './core'
-import { milestones, projects } from './projects'
+import { milestones, shoots } from './shoots'
 import { moodboards, moodItems, moodSections } from './moodboards'
-import { activity, assets, assetVersions, comments, deals, tasks } from './work'
+import { activity, assets, assetVersions, comments, invoices, licenses, tasks } from './work'
+import { EMPTY_BILLING } from '../defaults'
 
 /**
  * Builds a fresh copy of the demo database.
@@ -25,10 +27,12 @@ export function createSeedDatabase(): Database {
     team,
     companies,
     contacts,
-    projects,
+    leadSources,
+    shoots,
     milestones,
     tasks,
-    deals,
+    licenses,
+    invoices,
     pipeline,
     moodboards,
     moodSections,
@@ -42,7 +46,7 @@ export function createSeedDatabase(): Database {
     savedViews: [
       {
         id: 'sv_at_risk',
-        scope: 'projects',
+        scope: 'shoots',
         name: 'Needs attention',
         filters: { health: ['at-risk', 'blocked'] },
         sort: 'due-asc',
@@ -50,17 +54,17 @@ export function createSeedDatabase(): Database {
       },
       {
         id: 'sv_in_flight',
-        scope: 'projects',
+        scope: 'shoots',
         name: 'In production',
-        filters: { stage: ['production', 'review'] },
+        filters: { stage: ['st_shot', 'st_edited'] },
         sort: 'due-asc',
         layout: 'gallery',
       },
       {
-        id: 'sv_closing',
-        scope: 'deals',
-        name: 'Closing this quarter',
-        filters: { stage: ['ps_proposal', 'ps_negotiation'] },
+        id: 'sv_awaiting_reply',
+        scope: 'shoots',
+        name: 'Awaiting a reply',
+        filters: { stage: ['st_quoted'] },
         sort: 'value-desc',
         layout: 'list',
       },
@@ -86,14 +90,17 @@ export function createSeedDatabase(): Database {
 
 export const DEFAULT_WORKSPACE = {
   name: 'PLCBO',
-  tagline: 'Creative relationship management',
+  tagline: 'Photography, booked to delivered',
   ownerName: 'Ivy Marchetti',
-  ownerRole: 'Founder & Creative Director',
+  ownerRole: 'Founder & Photographer',
   ownerEmail: 'ivy@plcbo.studio',
   ownerAvatar: undefined as string | undefined,
   accent: 'lime' as const,
   currency: 'USD',
   locale: 'en-US',
+  // Blank until the studio fills it in. An invoice letterhead must never be
+  // populated with plausible-looking invented details.
+  billing: EMPTY_BILLING,
   onboarded: false,
 }
 
@@ -120,10 +127,12 @@ export function createEmptyDatabase(workspace: Database['settings']['workspace']
     ],
     companies: [],
     contacts: [],
-    projects: [],
+    leadSources: seed.leadSources,
+    shoots: [],
     milestones: [],
     tasks: [],
-    deals: [],
+    licenses: [],
+    invoices: [],
     // Pipelines, tags and custom fields are scaffolding worth keeping — an
     // empty workspace with no stages cannot do anything at all.
     pipeline: seed.pipeline,

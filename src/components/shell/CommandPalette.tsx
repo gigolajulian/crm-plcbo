@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, CornerDownLeft, Search } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { cn, formatCurrency, matches } from '@/lib/utils'
+import { cn, matches } from '@/lib/utils'
 import { Kbd } from '@/components/ui/primitives'
 import { EmptyState } from '@/components/ui/feedback'
 import { NAV } from './nav'
@@ -16,7 +16,7 @@ import { NAV } from './nav'
 
 type Result = {
   id: string
-  group: 'Jump to' | 'Projects' | 'Clients' | 'Companies' | 'Deals' | 'Tasks'
+  group: 'Jump to' | 'Shoots' | 'Clients' | 'Companies' | 'Invoices' | 'Tasks'
   title: string
   subtitle?: string
   meta?: string
@@ -30,10 +30,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const projects = useStore((s) => s.projects)
+  const shoots = useStore((s) => s.shoots)
   const contacts = useStore((s) => s.contacts)
   const companies = useStore((s) => s.companies)
-  const deals = useStore((s) => s.deals)
   const tasks = useStore((s) => s.tasks)
 
   const results = useMemo<Result[]>(() => {
@@ -47,16 +46,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     }
     if (!q) return out.slice(0, 8)
 
-    for (const project of projects) {
-      if (matches(`${project.name} ${project.code} ${project.summary}`, q)) {
-        const company = companies.find((c) => c.id === project.companyId)
+    for (const shoot of shoots) {
+      if (matches(`${shoot.name} ${shoot.code} ${shoot.summary}`, q)) {
+        const company = companies.find((c) => c.id === shoot.companyId)
         out.push({
-          id: project.id,
-          group: 'Projects',
-          title: project.name,
+          id: shoot.id,
+          group: 'Shoots',
+          title: shoot.name,
           subtitle: company?.name,
-          meta: project.code,
-          to: `/projects/${project.id}`,
+          meta: shoot.code,
+          to: `/shoots/${shoot.id}`,
         })
       }
     }
@@ -83,31 +82,19 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         })
       }
     }
-    for (const deal of deals) {
-      if (matches(deal.name, q)) {
-        out.push({
-          id: deal.id,
-          group: 'Deals',
-          title: deal.name,
-          subtitle: companies.find((c) => c.id === deal.companyId)?.name,
-          meta: formatCurrency(deal.value, { compact: true }),
-          to: `/deals/${deal.id}`,
-        })
-      }
-    }
     for (const task of tasks) {
       if (task.status !== 'done' && matches(task.title, q)) {
         out.push({
           id: task.id,
           group: 'Tasks',
           title: task.title,
-          subtitle: projects.find((p) => p.id === task.projectId)?.name,
+          subtitle: shoots.find((p) => p.id === task.shootId)?.name,
           to: '/tasks',
         })
       }
     }
     return out.slice(0, 24)
-  }, [query, projects, contacts, companies, deals, tasks])
+  }, [query, shoots, contacts, companies, tasks])
 
   useEffect(() => setActive(0), [query])
 
@@ -182,7 +169,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search projects, clients, deals, tasks…"
+            placeholder="Search shoots, clients, tasks…"
             aria-label="Search"
             aria-controls="palette-results"
             className="w-full bg-transparent text-body outline-none placeholder:text-ink-faint"
@@ -196,7 +183,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           {results.length === 0 ? (
             <EmptyState
               title={`Nothing matches “${query}”`}
-              body="Try a client name, a project code like FF-04, or a section such as Pipeline."
+              body="Try a client name, a shoot code like FF-04, or a section such as Pipeline."
               size="sm"
               className="border-0"
             />

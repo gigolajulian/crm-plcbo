@@ -1,24 +1,25 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Briefcase,
   Building2,
+  Camera,
   CalendarClock,
   CheckCircle2,
   CircleDashed,
-  Handshake,
+  FileText,
+  Scale,
   User,
 } from 'lucide-react'
 import type {
   ActivityEvent,
   ApprovalStatus,
   ID,
-  ProjectHealth,
-  ProjectStage,
+  PaperworkStatus,
+  ShootHealth,
   Tag,
   TaskPriority,
 } from '@/data/types'
-import { APPROVAL_STATUS, PROJECT_HEALTH, PROJECT_STAGES } from '@/data/types'
+import { APPROVAL_STATUS, PAPERWORK_STATUS, SHOOT_HEALTH } from '@/data/types'
 import { useStore } from '@/store/useStore'
 import { cn, daysFromToday, formatRelativeDay } from '@/lib/utils'
 import { Pill, StatusDot } from '@/components/ui/primitives'
@@ -34,10 +35,11 @@ import { CompanyMark } from './Img'
 /* --------------------------------------------------------- LinkedRecord -- */
 
 const RECORD_ICONS = {
-  project: Briefcase,
+  shoot: Camera,
   contact: User,
   company: Building2,
-  deal: Handshake,
+  invoice: FileText,
+  licence: Scale,
 }
 
 /**
@@ -51,7 +53,7 @@ export function LinkedRecord({
   showKind,
   className,
 }: {
-  kind: 'project' | 'contact' | 'company' | 'deal'
+  kind: 'shoot' | 'contact' | 'company' | 'invoice' | 'licence'
   id?: ID
   size?: 'sm' | 'md'
   showKind?: boolean
@@ -59,22 +61,25 @@ export function LinkedRecord({
 }) {
   const record = useStore((s) => {
     if (!id) return undefined
-    if (kind === 'project') return s.projects.find((p) => p.id === id)
+    if (kind === 'shoot') return s.shoots.find((p) => p.id === id)
     if (kind === 'contact') return s.contacts.find((c) => c.id === id)
     if (kind === 'company') return s.companies.find((c) => c.id === id)
-    return s.deals.find((d) => d.id === id)
+    if (kind === 'invoice') return s.invoices.find((i) => i.id === id)
+    return s.licenses.find((l) => l.id === id)
   })
 
   if (!record) return null
   const Icon = RECORD_ICONS[kind]
   const to =
-    kind === 'project'
-      ? `/projects/${id}`
+    kind === 'shoot'
+      ? `/shoots/${id}`
       : kind === 'contact'
         ? `/contacts/${id}`
         : kind === 'company'
           ? `/companies/${id}`
-          : `/deals/${id}`
+          : kind === 'invoice'
+            ? `/billing?invoice=${id}`
+            : `/licences?licence=${id}`
 
   return (
     <Link
@@ -165,17 +170,39 @@ export function DueBadge({
 
 /* ----------------------------------------------------------- StageBadge -- */
 
-export function StageBadge({ stage, size = 'sm' }: { stage: ProjectStage; size?: 'sm' | 'md' }) {
-  const meta = PROJECT_STAGES.find((s) => s.id === stage)
+export function StageBadge({ stageId, size = 'sm' }: { stageId: ID; size?: 'sm' | 'md' }) {
+  const stage = useStore((s) => s.pipeline.find((p) => p.id === stageId))
+  if (!stage) return null
+  const tone =
+    stage.kind === 'won' ? 'positive' : stage.kind === 'lost' ? 'critical' : 'neutral'
   return (
-    <Pill tone={stage === 'complete' ? 'positive' : 'neutral'} size={size}>
-      {meta?.label ?? stage}
+    <Pill tone={tone} size={size}>
+      {stage.name}
     </Pill>
   )
 }
 
-export function HealthBadge({ health, size = 'sm' }: { health: ProjectHealth; size?: 'sm' | 'md' }) {
-  const meta = PROJECT_HEALTH[health]
+/** Contract and model-release state. Unsigned paperwork is a red flag, not a note. */
+export function PaperworkBadge({
+  status,
+  label,
+  size = 'sm',
+}: {
+  status: PaperworkStatus
+  label: string
+  size?: 'sm' | 'md'
+}) {
+  if (status === 'not-required') return null
+  const meta = PAPERWORK_STATUS[status]
+  return (
+    <Pill tone={meta.tone as never} size={size}>
+      {label} · {meta.label}
+    </Pill>
+  )
+}
+
+export function HealthBadge({ health, size = 'sm' }: { health: ShootHealth; size?: 'sm' | 'md' }) {
+  const meta = SHOOT_HEALTH[health]
   return (
     <Pill tone={meta.tone as 'positive' | 'caution' | 'critical'} size={size} icon={<StatusDot tone={meta.tone as never} />}>
       {meta.label}

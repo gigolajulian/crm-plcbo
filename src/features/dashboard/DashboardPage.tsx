@@ -8,8 +8,9 @@ import {
   Stamp,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { isClosed } from '@/data/pipeline'
 import {
-  useActiveProjects,
+  useActiveShoots,
   useActivityFeed,
   useCurrentUser,
   useOpenFollowUps,
@@ -34,7 +35,7 @@ import {
   SectionHeading,
   TaskCheck,
 } from '@/components/common/records'
-import { ProjectCard } from '@/features/projects/ProjectCard'
+import { ShootCard } from '@/features/shoots/ShootCard'
 import { Button, ButtonLink, Card, Meter, Pill } from '@/components/ui/primitives'
 import { EmptyState, toast } from '@/components/ui/feedback'
 import { PipelineBar } from '@/components/charts'
@@ -48,7 +49,7 @@ import { PipelineBar } from '@/components/charts'
 export default function DashboardPage() {
   const user = useCurrentUser()
   const actions = usePriorityActions(6)
-  const projects = useActiveProjects()
+  const shoots = useActiveShoots()
   const milestones = useUpcomingMilestones(5)
   const buckets = useTaskBuckets(true)
   const reviews = useReviewQueue(['pending'])
@@ -91,7 +92,7 @@ export default function DashboardPage() {
         {/* ---------------------------------------------- priority column */}
         <div className="flex flex-col gap-4 lg:col-span-2 lg:gap-5">
           <PriorityPanel actions={actions} />
-          <ActiveProjects projects={projects.slice(0, 4)} />
+          <ActiveShoots shoots={shoots.slice(0, 4)} />
           <RecentActivity feed={feed} />
         </div>
 
@@ -183,37 +184,37 @@ function PriorityPanel({ actions }: { actions: ReturnType<typeof usePriorityActi
   )
 }
 
-/* ------------------------------------------------------ active projects -- */
+/* ------------------------------------------------------ active shoots -- */
 
-function ActiveProjects({ projects }: { projects: ReturnType<typeof useActiveProjects> }) {
+function ActiveShoots({ shoots }: { shoots: ReturnType<typeof useActiveShoots> }) {
   return (
     <section>
       <SectionHeading
         title="In flight"
-        count={projects.length}
+        count={shoots.length}
         action={
           <ButtonLink to="/projects" variant="ghost" size="sm" iconAfter={<ArrowUpRight size={14} />}>
-            All projects
+            All shoots
           </ButtonLink>
         }
       />
 
-      {projects.length === 0 ? (
+      {shoots.length === 0 ? (
         <EmptyState
-          title="No active projects"
+          title="No active shoots"
           body="Everything is either complete or not started yet."
           size="sm"
           action={
             <ButtonLink to="/projects" variant="primary">
-              Start a project
+              Start a shoot
             </ButtonLink>
           }
         />
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {projects.map((project) => (
-            <li key={project.id}>
-              <ProjectCard project={project} />
+          {shoots.map((shoot) => (
+            <li key={shoot.id}>
+              <ShootCard shoot={shoot} />
             </li>
           ))}
         </ul>
@@ -316,13 +317,13 @@ function UpcomingPanel({ milestones }: { milestones: ReturnType<typeof useUpcomi
                 </span>
                 <div className="min-w-0 flex-1">
                   <Link
-                    to={`/projects/${milestone.projectId}`}
+                    to={`/shoots/${milestone.shootId}`}
                     className="block truncate text-base hover:underline"
                   >
                     {milestone.name}
                   </Link>
                   <p className="truncate text-xs text-ink-muted">
-                    {milestone.project?.name} · {formatRelativeDay(milestone.date)}
+                    {milestone.shoot?.name} · {formatRelativeDay(milestone.date)}
                   </p>
                 </div>
                 {milestone.status === 'missed' && <Pill tone="critical" size="sm">Missed</Pill>}
@@ -386,7 +387,8 @@ function FollowUpsPanel({ followUps }: { followUps: ReturnType<typeof useOpenFol
 /* -------------------------------------------------------- pipeline card -- */
 
 function PipelinePanel({ summary }: { summary: ReturnType<typeof usePipelineSummary> }) {
-  const open = summary.byStage.filter((s) => s.kind === 'open')
+  // Everything still in play — the closed columns are not a forecast.
+  const open = summary.byStage.filter((s) => !isClosed(s.kind))
 
   return (
     <Card variant="inverse" padding="md" radius="2xl">
@@ -400,7 +402,7 @@ function PipelinePanel({ summary }: { summary: ReturnType<typeof usePipelineSumm
           </p>
         </div>
         <Link
-          to="/deals"
+          to="/shoots?view=board"
           aria-label="Open the pipeline"
           className="grid size-9 shrink-0 place-items-center rounded-full bg-[#ffffff1a] transition-colors duration-fast hover:bg-[#ffffff2e]"
         >
@@ -418,7 +420,7 @@ function PipelinePanel({ summary }: { summary: ReturnType<typeof usePipelineSumm
           </dd>
         </div>
         <div>
-          <dt className="text-on-inverse-muted">Open deals</dt>
+          <dt className="text-on-inverse-muted">Open enquiries</dt>
           <dd className="tabular mt-0.5 text-base">{summary.openCount}</dd>
         </div>
         <div>
@@ -478,8 +480,8 @@ function RecentActivity({ feed }: { feed: ReturnType<typeof useActivityFeed> }) 
                 )}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
                   <span>{formatRelativeTime(event.at)}</span>
-                  {event.links.projectId && (
-                    <LinkedRecord kind="project" id={event.links.projectId} size="sm" />
+                  {event.links.shootId && (
+                    <LinkedRecord kind="shoot" id={event.links.shootId} size="sm" />
                   )}
                   {event.links.contactId && (
                     <LinkedRecord kind="contact" id={event.links.contactId} size="sm" />

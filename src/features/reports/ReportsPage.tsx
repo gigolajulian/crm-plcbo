@@ -1,13 +1,9 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
-import {
-  useActiveProjects,
-  usePipelineSummary,
-  useSortedPipeline,
-  useTaskBuckets,
-  useWorkload,
-} from '@/store/selectors'
+import { isClosed } from '@/data/pipeline'
+import { lineItemsTotal, useActiveShoots, usePipelineSummary, useSortedPipeline, useTaskBuckets, useWorkload } from '@/store/selectors'
 import {
   cn,
   daysFromToday,
@@ -33,13 +29,13 @@ import { EmptyState } from '@/components/ui/feedback'
    ========================================================================== */
 
 export default function ReportsPage() {
-  const projects = useStore((s) => s.projects)
-  const deals = useStore((s) => s.deals)
+  const shoots = useStore((s) => s.shoots)
+  const invoices = useStore((s) => s.invoices)
   const activity = useStore((s) => s.activity)
   const pipeline = useSortedPipeline()
   const summary = usePipelineSummary()
   const workload = useWorkload()
-  const active = useActiveProjects()
+  const active = useActiveShoots()
   const buckets = useTaskBuckets(false)
 
   /* --------------------------------------------------------- revenue -- */
@@ -58,13 +54,13 @@ export default function ReportsPage() {
 
       const inRange = (from: Date, to: Date) =>
         sum(
-          deals
-            .filter((d) => {
+          shoots
+            .filter((d: Shoot) => {
               if (!wonStages.has(d.stageId) || !d.closedAt) return false
               const at = parseDate(d.closedAt).getTime()
               return at >= from.getTime() && at < to.getTime()
             })
-            .map((d) => d.value),
+            .map((d: Shoot) => lineItemsTotal(d.lineItems)),
         )
 
       months.push({
@@ -74,7 +70,7 @@ export default function ReportsPage() {
       })
     }
     return months
-  }, [deals, pipeline])
+  }, [shoots, pipeline])
 
   /* -------------------------------------------------------- activity -- */
 
@@ -103,25 +99,30 @@ export default function ReportsPage() {
   const atRisk = useMemo(
     () =>
       sortBy(
-        projects.filter(
-          (p) => p.stage !== 'complete' && (p.health !== 'on-track' || daysFromToday(p.dueDate) < 7),
+        shoots.filter(
+          (p) => !p.archived && (p.health !== 'on-track' || daysFromToday(p.expectedCloseDate) < 7),
         ),
-        (p) => p.dueDate,
+        (p) => p.expectedCloseDate,
       ),
-    [projects],
+    [shoots],
   )
 
   const budgetPressure = useMemo(
     () =>
       sortBy(
-        active.filter((p) => p.budget > 0),
-        (p) => -(p.spent / p.budget),
+        active.filter((p) => lineItemsTotal(p.lineItems) > 0),
+        (p) => -(0 / lineItemsTotal(p.lineItems)),
       ),
     [active],
   )
 
-  const totalBudget = sum(active.map((p) => p.budget))
-  const totalSpent = sum(active.map((p) => p.spent))
+  // Quoted against collected — the two numbers a photographer actually watches.
+  const totalQuoted = sum(active.map((p) => lineItemsTotal(p.lineItems)))
+  const totalCollected = sum(
+    invoices
+      .filter((inv) => inv.status === 'paid' && active.some((p) => p.id === inv.shootId))
+      .map((inv) => lineItemsTotal(inv.lineItems)),
+  )
 
   return (
     <div className="animate-in">
@@ -194,7 +195,7 @@ export default function ReportsPage() {
         {/* --------------------------------------------------- pipeline */}
         <Card variant="raised" padding="lg" radius="3xl">
           <SectionHeading title="Pipeline" description={pluralize(summary.openCount, 'open deal')} />
-          <PipelineBar segments={summary.byStage.filter((s) => s.kind === 'open')} className="mb-4" />
+          <PipelineBar segments={summary.byStage.filter((s) => !isClosed(s.kind))} className="mb-4" />
           <ul className="flex flex-col">
             {summary.byStage.map((stage, index) => (
               <li
@@ -216,23 +217,23 @@ export default function ReportsPage() {
           </ul>
         </Card>
 
-        {/* ------------------------------------------------ project health */}
+        {/* ------------------------------------------------ shoot health */}
         <Card variant="raised" padding="lg" radius="3xl" className="lg:col-span-2">
           <SectionHeading
             title="Project health"
             count={active.length}
-            description="Live projects, most urgent first."
+            description="Live shoots, most urgent first."
           />
           {active.length === 0 ? (
-            <EmptyState title="No live projects" size="sm" />
+            <EmptyState title="No live shoots" size="sm" />
           ) : (
             <ul className="flex flex-col">
-              {active.slice(0, 7).map((project, index) => {
-                const used = project.budget ? project.spent / project.budget : 0
-                const days = daysFromToday(project.dueDate)
+              {active.slice(0, 7).map((shoot, index) => {
+                const used = lineItemsTotal(shoot.lineItems) ? 0 / lineItemsTotal(shoot.lineItems) : 0
+                const days = daysFromToday(shoot.expectedCloseDate)
                 return (
                   <li
-                    key={project.id}
+                    key={shoot.id}
                     className={cn(
                       'flex flex-wrap items-center gap-x-4 gap-y-2 py-3',
                       index > 0 && 'border-t border-line-soft',
@@ -240,14 +241,14 @@ export default function ReportsPage() {
                   >
                     <div className="min-w-40 flex-1">
                       <Link
-                        to={`/projects/${project.id}`}
+                        to={`/shoots/${shoot.id}`}
                         className="text-base font-medium hover:underline"
                       >
-                        {project.name}
+                        {shoot.name}
                       </Link>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <StageBadge stage={project.stage} />
-                        <HealthBadge health={project.health} />
+                        <StageBadge stageId={shoot.stageId} />
+                        <HealthBadge health={shoot.health} />
                       </div>
                     </div>
 
@@ -256,10 +257,10 @@ export default function ReportsPage() {
                       <Meter
                         value={used}
                         tone={used > 0.95 ? 'critical' : used > 0.8 ? 'caution' : 'ink'}
-                        label={`${project.name} budget used`}
+                        label={`${shoot.name} budget used`}
                       />
                       <p className="tabular mt-1 text-2xs text-ink-muted">
-                        {Math.round(used * 100)}% of {formatCurrency(project.budget, { compact: true })}
+                        {Math.round(used * 100)}% of {formatCurrency(lineItemsTotal(shoot.lineItems), { compact: true })}
                       </p>
                     </div>
 
@@ -271,19 +272,19 @@ export default function ReportsPage() {
                           days < 0 ? 'font-medium text-critical' : days < 7 ? 'text-caution' : '',
                         )}
                       >
-                        {formatRelativeDay(project.dueDate)}
+                        {formatRelativeDay(shoot.expectedCloseDate)}
                       </p>
                     </div>
 
                     <ProgressRing
                       value={
-                        project.deliverables.length
-                          ? project.deliverables.filter((d) => d.done).length /
-                            project.deliverables.length
+                        shoot.deliverables.length
+                          ? shoot.deliverables.filter((d) => (d.delivered >= d.contracted)).length /
+                            shoot.deliverables.length
                           : 0
                       }
                       size={36}
-                      label={`${project.name} progress`}
+                      label={`${shoot.name} progress`}
                     />
                   </li>
                 )
@@ -334,9 +335,9 @@ export default function ReportsPage() {
             </p>
           ) : (
             <ul className="flex flex-col">
-              {atRisk.map((project, index) => (
+              {atRisk.map((shoot, index) => (
                 <li
-                  key={project.id}
+                  key={shoot.id}
                   className={cn(
                     'flex items-center gap-3 py-2.5',
                     index > 0 && 'border-t border-line-soft',
@@ -344,14 +345,14 @@ export default function ReportsPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <Link
-                      to={`/projects/${project.id}`}
+                      to={`/shoots/${shoot.id}`}
                       className="block truncate text-base hover:underline"
                     >
-                      {project.name}
+                      {shoot.name}
                     </Link>
-                    <p className="text-xs text-ink-muted">{formatRelativeDay(project.dueDate)}</p>
+                    <p className="text-xs text-ink-muted">{formatRelativeDay(shoot.expectedCloseDate)}</p>
                   </div>
-                  <HealthBadge health={project.health} />
+                  <HealthBadge health={shoot.health} />
                 </li>
               ))}
             </ul>
@@ -369,27 +370,27 @@ export default function ReportsPage() {
 
         {/* ---------------------------------------------------- budget */}
         <Card variant="surface" padding="lg" radius="3xl">
-          <SectionHeading title="Budget pressure" description="Live projects, most spent first." />
+          <SectionHeading title="Budget pressure" description="Live shoots, most spent first." />
           <div className="mb-5 flex items-baseline justify-between">
             <p className="tabular text-title font-medium tracking-title">
-              {formatCurrency(totalSpent, { compact: true })}
+              {formatCurrency(totalCollected, { compact: true })}
             </p>
             <p className="text-sm text-ink-muted">
-              of {formatCurrency(totalBudget, { compact: true })} committed
+              of {formatCurrency(totalQuoted, { compact: true })} committed
             </p>
           </div>
           <Meter
-            value={totalBudget ? totalSpent / totalBudget : 0}
+            value={totalQuoted ? totalCollected / totalQuoted : 0}
             tone="ink"
             label="Total budget used"
           />
           <ul className="mt-5 flex flex-col gap-3">
-            {budgetPressure.slice(0, 5).map((project) => {
-              const used = project.spent / project.budget
+            {budgetPressure.slice(0, 5).map((shoot) => {
+              const used = 0 / lineItemsTotal(shoot.lineItems)
               return (
-                <li key={project.id}>
+                <li key={shoot.id}>
                   <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 truncate text-sm">{project.name}</span>
+                    <span className="min-w-0 truncate text-sm">{shoot.name}</span>
                     <span
                       className={cn(
                         'tabular shrink-0 text-xs',
@@ -402,7 +403,7 @@ export default function ReportsPage() {
                   <Meter
                     value={used}
                     tone={used > 0.95 ? 'critical' : used > 0.8 ? 'caution' : 'ink'}
-                    label={`${project.name} budget`}
+                    label={`${shoot.name} budget`}
                   />
                 </li>
               )

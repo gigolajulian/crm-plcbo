@@ -250,7 +250,7 @@ export function Onboarding({
             <Section
               eyebrow="Step three"
               title="What do you bill in?"
-              body="Every deal value, project budget and revenue figure is shown in this currency, formatted for your region."
+              body="Every quote, invoice and revenue figure is shown in this currency, formatted for your region."
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Select
@@ -274,7 +274,7 @@ export function Onboarding({
                 <p className="eyebrow mb-3">Preview</p>
                 <dl className="flex flex-wrap gap-x-8 gap-y-3">
                   <div>
-                    <dt className="text-xs text-ink-muted">Deal value</dt>
+                    <dt className="text-xs text-ink-muted">Quote value</dt>
                     <dd className="tabular text-xl font-medium tracking-tight">
                       {money(148000, currency, locale)}
                     </dd>
@@ -304,7 +304,7 @@ export function Onboarding({
             <Section
               eyebrow="Step four"
               title="How does work come in?"
-              body="Your deal stages. Pick the shape that matches how you actually sell, then rename anything that does not fit."
+              body="Your lifecycle, from first enquiry to the licence running out. Pick the closest shape, then rename anything that does not fit."
             >
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {PIPELINE_TEMPLATES.map((template) => (
@@ -402,7 +402,7 @@ export function Onboarding({
 
                 <p className="mt-3 text-xs text-ink-muted">
                   Won and Lost are added automatically — the reports need to know which
-                  stages close a deal.
+                  stages close a shoot.
                 </p>
               </fieldset>
             </Section>

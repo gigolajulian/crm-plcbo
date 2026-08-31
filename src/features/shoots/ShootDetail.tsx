@@ -8,9 +8,15 @@ import {
   Plus,
   Stamp,
 } from 'lucide-react'
-import { PROJECT_STAGES, type ProjectStage } from '@/data/types'
 import { useStore } from '@/store/useStore'
-import { useActivityFeed, useProject, useProjectVitals } from '@/store/selectors'
+import {
+  shootEnd,
+  shootStart,
+  useActivityFeed,
+  useShoot,
+  useShootVitals,
+  useSortedPipeline,
+} from '@/store/selectors'
 import { useUI } from '@/store/useUI'
 import {
   cn,
@@ -18,6 +24,7 @@ import {
   formatCurrency,
   formatDate,
   formatRelativeTime,
+  sum,
 } from '@/lib/utils'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Img } from '@/components/common/Img'
@@ -38,26 +45,27 @@ import { Menu } from '@/components/ui/overlay'
 import { EmptyState, toast } from '@/components/ui/feedback'
 import { MoodboardCanvas } from '@/features/moodboard/MoodboardCanvas'
 import { ReviewRoom } from '@/features/approvals/ReviewRoom'
-import { ProjectBrief } from './ProjectBrief'
+import { ShootBrief } from './ShootBrief'
 
 type Tab = 'overview' | 'moodboard' | 'tasks' | 'work' | 'activity'
 
-export default function ProjectDetail() {
+export default function ShootDetail() {
   const { id = '' } = useParams()
   const [params, setParams] = useSearchParams()
-  const project = useProject(id)
-  const vitals = useProjectVitals(id)
+  const shoot = useShoot(id)
+  const vitals = useShootVitals(id)
 
   const allTasks = useStore((s) => s.tasks)
   const allAssets = useStore((s) => s.assets)
   // Filtering inside a zustand selector returns a new array on every render,
   // which sends useSyncExternalStore into a loop. Derive with useMemo instead.
-  const tasks = useMemo(() => allTasks.filter((t) => t.projectId === id), [allTasks, id])
-  const assets = useMemo(() => allAssets.filter((a) => a.projectId === id), [allAssets, id])
+  const tasks = useMemo(() => allTasks.filter((t) => t.shootId === id), [allTasks, id])
+  const assets = useMemo(() => allAssets.filter((a) => a.shootId === id), [allAssets, id])
   const moodItems = useStore((s) => s.moodItems)
   const boards = useStore((s) => s.moodboards)
-  const setProjectStage = useStore((s) => s.setProjectStage)
-  const updateProject = useStore((s) => s.updateProject)
+  const moveShoot = useStore((s) => s.moveShoot)
+  const pipeline = useSortedPipeline()
+  const updateShoot = useStore((s) => s.updateShoot)
 
   const tab = (params.get('tab') as Tab) ?? 'overview'
   function setTab(next: Tab) {
@@ -68,17 +76,17 @@ export default function ProjectDetail() {
     })
   }
 
-  if (!project) {
+  if (!shoot) {
     return (
       <EmptyState
-        title="Project not found"
+        title="Shoot not found"
         body="It may have been deleted, or the link may be out of date."
         size="lg"
       />
     )
   }
 
-  const board = boards.find((b) => b.projectId === project.id)
+  const board = boards.find((b) => b.shootId === shoot.id)
   const referenceCount = board ? moodItems.filter((i) => i.boardId === board.id).length : 0
   const openTasks = tasks.filter((t) => t.status !== 'done').length
 
@@ -86,36 +94,40 @@ export default function ProjectDetail() {
     <div className="animate-in">
       <PageHeader
         crumbs={[
-          { label: 'Projects', to: '/projects' },
-          { label: project.name },
+          { label: 'Shoots', to: '/shoots' },
+          { label: shoot.name },
         ]}
-        title={project.name}
-        description={project.summary}
+        title={shoot.name}
+        description={shoot.summary}
         meta={
           <>
-            <Pill tone="neutral">{project.code}</Pill>
-            <StageBadge stage={project.stage} size="md" />
-            <HealthBadge health={project.health} size="md" />
-            <DueBadge date={project.dueDate} size="md" prefix="Due" />
-            <LinkedRecord kind="company" id={project.companyId} />
-            <LinkedRecord kind="contact" id={project.clientContactId} />
+            <Pill tone="neutral">{shoot.code}</Pill>
+            <StageBadge stageId={shoot.stageId} size="md" />
+            <HealthBadge health={shoot.health} size="md" />
+            <DueBadge
+              date={vitals.nextShootDate ?? shoot.expectedCloseDate}
+              size="md"
+              prefix={vitals.nextShootDate ? 'Shoots' : 'Closes'}
+            />
+            <LinkedRecord kind="company" id={shoot.companyId} />
+            <LinkedRecord kind="contact" id={shoot.contactId} />
           </>
         }
         actions={
           <>
             <Menu
               label="Change stage"
-              items={PROJECT_STAGES.map((stage) => ({
-                label: stage.label,
-                selected: stage.id === project.stage,
+              items={pipeline.map((stage) => ({
+                label: stage.name,
+                selected: stage.id === shoot.stageId,
                 onSelect: () => {
-                  setProjectStage(project.id, stage.id as ProjectStage)
-                  toast.success(`Moved to ${stage.label}`)
+                  moveShoot(shoot.id, stage.id)
+                  toast.success(`Moved to ${stage.name}`)
                 },
               }))}
               trigger={({ onClick, ...rest }) => (
                 <Button onClick={onClick} {...rest}>
-                  Stage: {PROJECT_STAGES.find((s) => s.id === project.stage)?.label}
+                  Stage: {pipeline.find((s) => s.id === shoot.stageId)?.name ?? 'Unset'}
                 </Button>
               )}
             />
@@ -123,9 +135,9 @@ export default function ProjectDetail() {
               label="Change health"
               items={(['on-track', 'at-risk', 'blocked'] as const).map((health) => ({
                 label: health === 'on-track' ? 'On track' : health === 'at-risk' ? 'At risk' : 'Blocked',
-                selected: health === project.health,
+                selected: health === shoot.health,
                 onSelect: () => {
-                  updateProject(project.id, { health })
+                  updateShoot(shoot.id, { health })
                   toast.show('Health updated')
                 },
               }))}
@@ -144,9 +156,9 @@ export default function ProjectDetail() {
       <Card variant="raised" padding="none" radius="3xl" className="mb-6 overflow-hidden">
         <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1.4fr_1fr]">
           <Img
-            src={project.coverUrl}
-            seed={project.artSeed}
-            alt={`Cover for ${project.name}`}
+            src={shoot.coverUrl}
+            seed={shoot.artSeed}
+            alt={`Cover for ${shoot.name}`}
             ratio={16 / 9}
             eager
             className="w-full lg:h-full"
@@ -156,24 +168,24 @@ export default function ProjectDetail() {
               <div className="flex items-center gap-2.5">
                 <ProgressRing value={vitals.progress} size={36} />
                 <span className="text-sm text-ink-muted">
-                  {project.deliverables.filter((d) => d.done).length} of{' '}
-                  {project.deliverables.length}
+                  {sum(shoot.deliverables.map((d) => d.delivered))} of{' '}
+                  {sum(shoot.deliverables.map((d) => d.contracted))} files
                 </span>
               </div>
             </Vital>
 
-            <Vital label="Budget">
+            <Vital label="Collected">
               <p className="tabular text-lg font-medium">
-                {formatCurrency(project.spent, { compact: true })}
+                {formatCurrency(vitals.money.received, { compact: true })}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
-                of {formatCurrency(project.budget, { compact: true })}
+                of {formatCurrency(vitals.money.quoted, { compact: true })} quoted
               </p>
               <Meter
                 className="mt-2"
-                value={vitals.budgetUsed}
-                tone={vitals.budgetUsed > 0.95 ? 'critical' : vitals.budgetUsed > 0.8 ? 'caution' : 'ink'}
-                label="Budget used"
+                value={vitals.collected}
+                tone={vitals.money.overdue.length > 0 ? 'critical' : vitals.collected >= 1 ? 'lime' : 'ink'}
+                label="Share of the quote collected"
               />
             </Vital>
 
@@ -184,7 +196,7 @@ export default function ProjectDetail() {
                   : `${vitals.daysRemaining}d left`}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
-                {formatDate(project.startDate, 'short')} → {formatDate(project.dueDate, 'short')}
+                {formatDate(shootStart(shoot), 'short')} → {formatDate(shootEnd(shoot), 'short')}
               </p>
             </Vital>
 
@@ -202,12 +214,12 @@ export default function ProjectDetail() {
             </Vital>
 
             <Vital label="Team">
-              <ProjectTeam projectId={project.id} />
+              <ShootTeam shootId={shoot.id} />
             </Vital>
 
             <Vital label="Tags">
-              {project.tags.length > 0 ? (
-                <TagList ids={project.tags} />
+              {shoot.tags.length > 0 ? (
+                <TagList ids={shoot.tags} />
               ) : (
                 <p className="text-sm text-ink-muted">None</p>
               )}
@@ -220,7 +232,7 @@ export default function ProjectDetail() {
       <Tabs
         value={tab}
         onChange={setTab}
-        label="Project sections"
+        label="Shoot sections"
         className="mb-6"
         items={[
           { value: 'overview', label: 'Brief', icon: <FileText size={14} /> },
@@ -232,23 +244,23 @@ export default function ProjectDetail() {
       />
 
       <TabPanel when="overview" value={tab}>
-        <ProjectBrief project={project} />
+        <ShootBrief shoot={shoot} />
       </TabPanel>
 
       <TabPanel when="moodboard" value={tab}>
-        <MoodboardCanvas projectId={project.id} />
+        <MoodboardCanvas shootId={shoot.id} />
       </TabPanel>
 
       <TabPanel when="tasks" value={tab}>
-        <ProjectTasks projectId={project.id} />
+        <ShootTasks shootId={shoot.id} />
       </TabPanel>
 
       <TabPanel when="work" value={tab}>
-        <ReviewRoom projectId={project.id} assetIds={assets.map((a) => a.id)} />
+        <ReviewRoom shootId={shoot.id} assetIds={assets.map((a) => a.id)} />
       </TabPanel>
 
       <TabPanel when="activity" value={tab}>
-        <ProjectActivity projectId={project.id} />
+        <ShootActivity shootId={shoot.id} />
       </TabPanel>
     </div>
   )
@@ -265,12 +277,12 @@ function Vital({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function ProjectTeam({ projectId }: { projectId: string }) {
-  const project = useProject(projectId)
+function ShootTeam({ shootId }: { shootId: string }) {
+  const shoot = useShoot(shootId)
   const team = useStore((s) => s.team)
-  if (!project) return null
-  const members = team.filter((m) => project.memberIds.includes(m.id))
-  const lead = team.find((m) => m.id === project.leadId)
+  if (!shoot) return null
+  const members = team.filter((m) => shoot.memberIds.includes(m.id))
+  const lead = team.find((m) => m.id === shoot.ownerId)
 
   return (
     <div className="flex items-center gap-2.5">
@@ -295,21 +307,21 @@ function AddTaskButton() {
 
 /* ---------------------------------------------------------------- tasks -- */
 
-function ProjectTasks({ projectId }: { projectId: string }) {
+function ShootTasks({ shootId }: { shootId: string }) {
   const tasks = useStore((s) => s.tasks)
   const team = useStore((s) => s.team)
   const toggleTask = useStore((s) => s.toggleTask)
   const addTask = useStore((s) => s.addTask)
   const [draft, setDraft] = useState('')
 
-  const mine = tasks.filter((t) => t.projectId === projectId)
+  const mine = tasks.filter((t) => t.shootId === shootId)
   const open = mine.filter((t) => t.status !== 'done')
   const done = mine.filter((t) => t.status === 'done')
 
   function quickAdd(event: React.FormEvent) {
     event.preventDefault()
     if (!draft.trim()) return
-    addTask({ title: draft.trim(), projectId })
+    addTask({ title: draft.trim(), shootId })
     toast.success('Task added')
     setDraft('')
   }
@@ -319,11 +331,11 @@ function ProjectTasks({ projectId }: { projectId: string }) {
       <div>
         <Card variant="raised" padding="md" radius="2xl" className="mb-4">
           <form onSubmit={quickAdd} className="flex items-center gap-2">
-            <label htmlFor="project-task" className="sr-only-focusable absolute">
-              Add a task to this project
+            <label htmlFor="shoot-task" className="sr-only-focusable absolute">
+              Add a task to this shoot
             </label>
             <input
-              id="project-task"
+              id="shoot-task"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Add a task and press enter"
@@ -337,7 +349,7 @@ function ProjectTasks({ projectId }: { projectId: string }) {
 
         <SectionHeading title="Open" count={open.length} />
         {open.length === 0 ? (
-          <EmptyState title="Nothing open" body="Every task on this project is done." size="sm" />
+          <EmptyState title="Nothing open" body="Every task on this shoot is done." size="sm" />
         ) : (
           <ul className="flex flex-col gap-2">
             {open.map((task) => {
@@ -396,22 +408,22 @@ function ProjectTasks({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      <ProjectMilestones projectId={projectId} />
+      <ShootMilestones shootId={shootId} />
     </div>
   )
 }
 
 /* ----------------------------------------------------------- milestones -- */
 
-function ProjectMilestones({ projectId }: { projectId: string }) {
+function ShootMilestones({ shootId }: { shootId: string }) {
   const allMilestones = useStore((s) => s.milestones)
   const updateMilestone = useStore((s) => s.updateMilestone)
   const sorted = useMemo(
     () =>
       allMilestones
-        .filter((m) => m.projectId === projectId)
+        .filter((m) => m.shootId === shootId)
         .sort((a, b) => a.date.localeCompare(b.date)),
-    [allMilestones, projectId],
+    [allMilestones, shootId],
   )
 
   return (
@@ -480,15 +492,15 @@ function ProjectMilestones({ projectId }: { projectId: string }) {
 
 /* ------------------------------------------------------------- activity -- */
 
-function ProjectActivity({ projectId }: { projectId: string }) {
-  const feed = useActivityFeed({ projectId })
+function ShootActivity({ shootId }: { shootId: string }) {
+  const feed = useActivityFeed({ shootId })
   const openQuickAdd = useUI((s) => s.openQuickAdd)
 
   if (feed.length === 0) {
     return (
       <EmptyState
         icon={<ActivityIcon size={20} />}
-        title="No activity on this project yet"
+        title="No activity on this shoot yet"
         body="Calls, emails, approvals and status changes appear here as they happen."
         action={
           <Button variant="primary" onClick={() => openQuickAdd('log')}>

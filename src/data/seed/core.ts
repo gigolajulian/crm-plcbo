@@ -2,11 +2,13 @@ import type {
   Company,
   Contact,
   CustomField,
+  LeadSource,
   NotificationPrefs,
   PipelineStage,
   Tag,
   TeamMember,
 } from '../types'
+import { DEFAULT_PIPELINE } from '../pipeline'
 import { portrait } from '../images'
 import { d } from './clock'
 
@@ -16,7 +18,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_ivy',
     name: 'Ivy Marchetti',
-    role: 'Founder & Creative Director',
+    role: 'Founder & Photographer',
     permissionRole: 'owner',
     email: 'ivy@plcbo.studio',
     avatar: portrait(5),
@@ -26,7 +28,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_dez',
     name: 'Dez Okonkwo',
-    role: 'Design Lead',
+    role: 'First Assistant',
     permissionRole: 'admin',
     email: 'dez@plcbo.studio',
     avatar: portrait(12),
@@ -36,7 +38,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_salla',
     name: 'Salla Virtanen',
-    role: 'Executive Producer',
+    role: 'Producer',
     permissionRole: 'admin',
     email: 'salla@plcbo.studio',
     avatar: portrait(9),
@@ -46,7 +48,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_marco',
     name: 'Marco Reyes',
-    role: 'Motion & 3D',
+    role: 'Digital Tech',
     permissionRole: 'member',
     email: 'marco@plcbo.studio',
     avatar: portrait(33),
@@ -56,7 +58,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_noor',
     name: 'Noor Haddad',
-    role: 'Brand Strategist',
+    role: 'Retoucher',
     permissionRole: 'member',
     email: 'noor@plcbo.studio',
     avatar: portrait(26),
@@ -66,7 +68,7 @@ export const team: TeamMember[] = [
   {
     id: 'tm_tomas',
     name: 'Tomás Bergeron',
-    role: 'Designer',
+    role: 'Second Assistant',
     permissionRole: 'member',
     email: 'tomas@plcbo.studio',
     avatar: portrait(60),
@@ -80,29 +82,34 @@ export const CURRENT_USER_ID = 'tm_ivy'
 /* ----------------------------------------------------------------- tags -- */
 
 export const tags: Tag[] = [
-  { id: 'tag_brand', label: 'Brand', tone: 'lime' },
+  { id: 'tag_editorial', label: 'Editorial', tone: 'lime' },
   { id: 'tag_campaign', label: 'Campaign', tone: 'info' },
-  { id: 'tag_packaging', label: 'Packaging', tone: 'neutral' },
-  { id: 'tag_digital', label: 'Digital', tone: 'info' },
-  { id: 'tag_motion', label: 'Motion', tone: 'lime' },
-  { id: 'tag_print', label: 'Print', tone: 'neutral' },
+  { id: 'tag_lookbook', label: 'Lookbook', tone: 'neutral' },
+  { id: 'tag_food', label: 'Food', tone: 'lime' },
+  { id: 'tag_interiors', label: 'Interiors', tone: 'neutral' },
+  { id: 'tag_portrait', label: 'Portrait', tone: 'info' },
+  { id: 'tag_studio', label: 'Studio', tone: 'neutral' },
+  { id: 'tag_location', label: 'On location', tone: 'info' },
+  { id: 'tag_talent', label: 'Talent booked', tone: 'caution' },
   { id: 'tag_retainer', label: 'Retainer', tone: 'positive' },
-  { id: 'tag_new-business', label: 'New business', tone: 'caution' },
   { id: 'tag_priority', label: 'Priority', tone: 'critical' },
-  { id: 'tag_hospitality', label: 'Hospitality', tone: 'neutral' },
-  { id: 'tag_sustainable', label: 'Sustainable', tone: 'positive' },
   { id: 'tag_referral', label: 'Referral', tone: 'positive' },
 ]
 
 /* ------------------------------------------------------------- pipeline -- */
 
-export const pipeline: PipelineStage[] = [
-  { id: 'ps_lead', name: 'Lead', order: 0, probability: 10, kind: 'open' },
-  { id: 'ps_qualified', name: 'Qualified', order: 1, probability: 25, kind: 'open' },
-  { id: 'ps_proposal', name: 'Proposal sent', order: 2, probability: 50, kind: 'open' },
-  { id: 'ps_negotiation', name: 'Negotiation', order: 3, probability: 75, kind: 'open' },
-  { id: 'ps_won', name: 'Won', order: 4, probability: 100, kind: 'won' },
-  { id: 'ps_lost', name: 'Lost', order: 5, probability: 0, kind: 'lost' },
+export const pipeline: PipelineStage[] = DEFAULT_PIPELINE
+
+/* --------------------------------------------------------- lead sources -- */
+
+export const leadSources: LeadSource[] = [
+  { id: 'ls_referral_client', label: 'Client referral', category: 'referral', active: true },
+  { id: 'ls_referral_crew', label: 'Crew referral', category: 'referral', active: true },
+  { id: 'ls_instagram', label: 'Instagram', category: 'social', active: true },
+  { id: 'ls_portfolio', label: 'Portfolio site', category: 'direct', active: true },
+  { id: 'ls_agency', label: 'Agency roster', category: 'agency', active: true },
+  { id: 'ls_repeat', label: 'Repeat client', category: 'repeat', active: true },
+  { id: 'ls_directory', label: 'Photo directory', category: 'other', active: false },
 ]
 
 /* ------------------------------------------------------------ companies -- */
@@ -390,7 +397,7 @@ export const customFields: CustomField[] = [
     id: 'cf_studio_rate',
     label: 'Rate card',
     type: 'select',
-    entity: 'project',
+    entity: 'shoot',
     options: ['Standard', 'Retainer', 'Preferred', 'Pro bono'],
     required: false,
   },
@@ -398,7 +405,7 @@ export const customFields: CustomField[] = [
     id: 'cf_contract',
     label: 'Contract signed',
     type: 'checkbox',
-    entity: 'project',
+    entity: 'shoot',
     required: true,
   },
   {
@@ -429,9 +436,10 @@ export const customFields: CustomField[] = [
 export const notifications: NotificationPrefs = {
   approvalRequests: true,
   taskAssignments: true,
-  dealStageChanges: true,
+  stageChanges: true,
   milestoneReminders: true,
   clientReplies: true,
+  licenceExpiry: true,
   weeklyDigest: false,
   channel: 'both',
 }

@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
+import { shootEnd, shootStart } from '@/store/selectors'
 import { Link } from 'react-router-dom'
-import type { Project } from '@/data/types'
+import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
+import { isClosed } from '@/data/pipeline'
 import { cn, formatDate, parseDate } from '@/lib/utils'
 import { Card } from '@/components/ui/primitives'
 import { HealthBadge, StageBadge } from '@/components/common/records'
@@ -10,17 +12,23 @@ import { Img } from '@/components/common/Img'
 /* ============================================================================
    TIMELINE VIEW
    A schedule, not a Gantt chart with dependency arrows: bars for the run of
-   each project, dots for its milestones, and a line for today. The point is to
+   each shoot, dots for its milestones, and a line for today. The point is to
    see collisions and gaps, not to manage critical paths.
    ========================================================================== */
 
 const DAY = 86400000
 
-export function ProjectTimeline({ projects }: { projects: Project[] }) {
+export function ShootTimeline({ shoots }: { shoots: Shoot[] }) {
   const milestones = useStore((s) => s.milestones)
+  const pipeline = useStore((s) => s.pipeline)
+  // A closed shoot draws grey rather than accent — it is history, not work.
+  const closedStages = useMemo(
+    () => new Set(pipeline.filter((p) => isClosed(p.kind)).map((p) => p.id)),
+    [pipeline],
+  )
 
   const { start, end, months, todayOffset, totalDays } = useMemo(() => {
-    const dates = projects.flatMap((p) => [parseDate(p.startDate), parseDate(p.dueDate)])
+    const dates = shoots.flatMap((p) => [parseDate(shootStart(p)), parseDate(shootEnd(p))])
     const now = new Date()
     dates.push(now)
 
@@ -53,13 +61,13 @@ export function ProjectTimeline({ projects }: { projects: Project[] }) {
       totalDays: span,
       todayOffset: ((now.getTime() - min.getTime()) / DAY / span) * 100,
     }
-  }, [projects])
+  }, [shoots])
 
   function positionOf(dateString: string) {
     return ((parseDate(dateString).getTime() - start.getTime()) / DAY / totalDays) * 100
   }
 
-  if (projects.length === 0) return null
+  if (shoots.length === 0) return null
 
   return (
     <Card variant="raised" padding="none" radius="2xl" className="overflow-hidden">
@@ -88,15 +96,15 @@ export function ProjectTimeline({ projects }: { projects: Project[] }) {
               <span className="absolute -top-0.5 -left-1 size-2 rounded-full bg-lime" />
             </li>
 
-            {projects.map((project, index) => {
-              const projectMilestones = milestones.filter((m) => m.projectId === project.id)
-              const left = positionOf(project.startDate)
-              const right = positionOf(project.dueDate)
+            {shoots.map((shoot, index) => {
+              const shootMilestones = milestones.filter((m) => m.shootId === shoot.id)
+              const left = positionOf(shootStart(shoot))
+              const right = positionOf(shootEnd(shoot))
               const width = Math.max(1.5, right - left)
 
               return (
                 <li
-                  key={project.id}
+                  key={shoot.id}
                   className={cn(
                     'relative flex items-center gap-3 py-2.5 pr-6',
                     index > 0 && 'border-t border-line-soft',
@@ -104,20 +112,20 @@ export function ProjectTimeline({ projects }: { projects: Project[] }) {
                 >
                   <div className="flex w-56 shrink-0 items-center gap-2.5 pl-4">
                     <Img
-                      src={project.coverUrl}
-                      seed={project.artSeed}
+                      src={shoot.coverUrl}
+                      seed={shoot.artSeed}
                       alt=""
                       ratio={1}
                       className="w-9 shrink-0 rounded-md"
                     />
                     <div className="min-w-0">
                       <Link
-                        to={`/projects/${project.id}`}
+                        to={`/shoots/${shoot.id}`}
                         className="block truncate text-sm font-medium hover:underline"
                       >
-                        {project.name}
+                        {shoot.name}
                       </Link>
-                      <p className="tabular truncate text-2xs text-ink-faint">{project.code}</p>
+                      <p className="tabular truncate text-2xs text-ink-faint">{shoot.code}</p>
                     </div>
                   </div>
 
@@ -125,23 +133,23 @@ export function ProjectTimeline({ projects }: { projects: Project[] }) {
                     <div
                       className={cn(
                         'group absolute top-1/2 flex h-7 -translate-y-1/2 items-center rounded-pill px-3',
-                        project.health === 'blocked'
+                        shoot.health === 'blocked'
                           ? 'bg-critical-wash'
-                          : project.health === 'at-risk'
+                          : shoot.health === 'at-risk'
                             ? 'bg-caution-wash'
-                            : project.stage === 'complete'
+                            : closedStages.has(shoot.stageId)
                               ? 'bg-line'
                               : 'bg-lime-pale',
                       )}
                       style={{ left: `${left}%`, width: `${width}%` }}
-                      title={`${project.name}: ${formatDate(project.startDate)} – ${formatDate(project.dueDate)}`}
+                      title={`${shoot.name}: ${formatDate(shootStart(shoot))} – ${formatDate(shootEnd(shoot))}`}
                     >
                       <span className="truncate text-2xs font-medium text-[#2b2b28] dark:text-ink">
-                        {formatDate(project.startDate, 'short')} – {formatDate(project.dueDate, 'short')}
+                        {formatDate(shootStart(shoot), 'short')} – {formatDate(shootEnd(shoot), 'short')}
                       </span>
                     </div>
 
-                    {projectMilestones.map((milestone) => (
+                    {shootMilestones.map((milestone) => (
                       <span
                         key={milestone.id}
                         className={cn(
@@ -159,8 +167,8 @@ export function ProjectTimeline({ projects }: { projects: Project[] }) {
                   </div>
 
                   <div className="hidden w-40 shrink-0 justify-end gap-1.5 lg:flex">
-                    <StageBadge stage={project.stage} />
-                    {project.health !== 'on-track' && <HealthBadge health={project.health} />}
+                    <StageBadge stageId={shoot.stageId} />
+                    {shoot.health !== 'on-track' && <HealthBadge health={shoot.health} />}
                   </div>
                 </li>
               )

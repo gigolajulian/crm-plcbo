@@ -75,13 +75,13 @@ function payloadFor(spec: ItemSpec, seedBase: string): MoodPayload {
 const CONTRIBUTORS = ['tm_dez', 'tm_ivy', 'tm_noor', 'tm_tomas', 'tm_marco']
 
 function board(
-  projectId: string,
+  shootId: string,
   title: string,
   updatedDaysAgo: number,
   specs: SectionSpec[],
 ): void {
-  const boardId = `mb_${projectId.replace('pj_', '')}`
-  boards.push({ id: boardId, projectId, title, updatedAt: t(-updatedDaysAgo, 15) })
+  const boardId = `mb_${shootId.replace('sh_', '')}`
+  boards.push({ id: boardId, shootId, title, updatedAt: t(-updatedDaysAgo, 15) })
 
   specs.forEach((section, sIndex) => {
     const sectionId = `${boardId}_s${sIndex}`
@@ -115,7 +115,7 @@ function board(
 
 /* --------------------------------------------------------- Quiet Objects -- */
 
-board('pj_quiet', 'Quiet Objects — AW campaign', 1, [
+board('sh_fold_aw', 'Quiet Objects — AW campaign', 1, [
   {
     title: 'The feeling',
     description: 'Rooms that look lived in. Nothing arranged for the camera.',
@@ -152,7 +152,7 @@ board('pj_quiet', 'Quiet Objects — AW campaign', 1, [
 
 /* ---------------------------------------------------- Showroom identity -- */
 
-board('pj_showroom', 'Showroom system', 4, [
+board('sh_fold_showroom', 'Showroom system', 4, [
   {
     title: 'Signage in architecture',
     description: 'Part of the building, not applied to it.',
@@ -176,7 +176,7 @@ board('pj_showroom', 'Showroom system', 4, [
 
 /* ------------------------------------------------------- Marrow No.3 --- */
 
-board('pj_marrow3', 'Marrow No.3', 0, [
+board('sh_marrow_three', 'Marrow No.3', 0, [
   {
     title: 'Room & mood',
     description: 'Warmer and looser than No.1. A room you stay in.',
@@ -211,7 +211,7 @@ board('pj_marrow3', 'Marrow No.3', 0, [
 
 /* --------------------------------------------------------- Menu system -- */
 
-board('pj_menu', 'Menu & print', 9, [
+board('sh_marrow_menu', 'Menu & print', 9, [
   {
     title: 'Set by a non-designer',
     items: [
@@ -225,7 +225,7 @@ board('pj_menu', 'Menu & print', 9, [
 
 /* -------------------------------------------------------- Trail Season -- */
 
-board('pj_trail', 'Trail Season', 2, [
+board('sh_north_trail', 'Trail Season', 2, [
   {
     title: 'The middle of the trip',
     description: 'Not the summit. The fourth wet morning.',
@@ -259,7 +259,7 @@ board('pj_trail', 'Trail Season', 2, [
 
 /* ------------------------------------------------- Northbound discovery -- */
 
-board('pj_nbrebrand', 'Rebrand discovery', 3, [
+board('sh_north_lookbook', 'Rebrand discovery', 3, [
   {
     title: 'Category audit',
     description: 'Where everyone else already is.',
@@ -283,7 +283,7 @@ board('pj_nbrebrand', 'Rebrand discovery', 3, [
 
 /* ------------------------------------------------------- Third Slope --- */
 
-board('pj_slope', 'Packaging refresh', 5, [
+board('sh_third_roastery', 'Packaging refresh', 5, [
   {
     title: 'Shelf reality',
     items: [
@@ -308,7 +308,7 @@ board('pj_slope', 'Packaging refresh', 5, [
 
 /* ----------------------------------------------------- Atrium monograph -- */
 
-board('pj_atrium', 'Site & monograph', 6, [
+board('sh_atrium_civic', 'Site & monograph', 6, [
   {
     title: 'The page first',
     description: 'Elke judges every screen as a spread. Design the book, inherit the site.',
@@ -331,7 +331,7 @@ board('pj_atrium', 'Site & monograph', 6, [
 
 /* ------------------------------------------------------------- Ritual -- */
 
-board('pj_ritual', 'Ritual line', 48, [
+board('sh_salt_ritual', 'Ritual line', 48, [
   {
     title: 'Delivered',
     description: 'Kept for reference — the range is in market.',

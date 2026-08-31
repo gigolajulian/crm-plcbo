@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import { MessageSquare, Paperclip } from 'lucide-react'
-import type { Project } from '@/data/types'
+import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
-import { useProjectVitals } from '@/store/selectors'
+import { useShootVitals } from '@/store/selectors'
 import { cn, formatCurrency, pluralize } from '@/lib/utils'
 import { Card, Meter, Pill, ProgressRing } from '@/components/ui/primitives'
 import { AvatarStack } from '@/components/ui/Avatar'
@@ -10,25 +10,25 @@ import { Img } from '@/components/common/Img'
 import { DueBadge, HealthBadge, StageBadge, TagList } from '@/components/common/records'
 
 /**
- * The gallery project card.
+ * The gallery shoot card.
  *
  * Uses a stretched link: the title anchor covers the whole card via a
  * pseudo-element, so the card is one big target while the company link and
  * other controls stay individually reachable — and no anchor nests in another.
  */
-export function ProjectCard({
-  project,
+export function ShootCard({
+  shoot,
   size = 'md',
 }: {
-  project: Project
+  shoot: Shoot
   size?: 'md' | 'lg'
 }) {
   const team = useStore((s) => s.team)
-  const company = useStore((s) => s.companies.find((c) => c.id === project.companyId))
-  const vitals = useProjectVitals(project.id)
+  const company = useStore((s) => s.companies.find((c) => c.id === shoot.companyId))
+  const vitals = useShootVitals(shoot.id)
 
-  const members = team.filter((m) => project.memberIds.includes(m.id))
-  const lead = team.find((m) => m.id === project.leadId)
+  const members = team.filter((m) => shoot.memberIds.includes(m.id))
+  const owner = team.find((m) => m.id === shoot.ownerId)
 
   return (
     <Card
@@ -40,8 +40,8 @@ export function ProjectCard({
     >
       <div className="relative">
         <Img
-          src={project.coverUrl}
-          seed={project.artSeed}
+          src={shoot.coverUrl}
+          seed={shoot.artSeed}
           alt=""
           ratio={size === 'lg' ? 16 / 10 : 3 / 2}
           className="w-full"
@@ -49,9 +49,9 @@ export function ProjectCard({
         />
         <span className="absolute top-3 left-3 flex flex-wrap gap-1.5">
           <Pill tone="ink" size="sm" className="backdrop-blur-sm">
-            {project.code}
+            {shoot.code}
           </Pill>
-          {project.health !== 'on-track' && <HealthBadge health={project.health} />}
+          {shoot.health !== 'on-track' && <HealthBadge health={shoot.health} />}
         </span>
         {vitals.awaitingApproval > 0 && (
           <span className="absolute top-3 right-3">
@@ -67,10 +67,10 @@ export function ProjectCard({
           <div className="min-w-0">
             <h3 className={cn('truncate font-medium tracking-tight', size === 'lg' ? 'text-xl' : 'text-lg')}>
               <Link
-                to={`/projects/${project.id}`}
+                to={`/shoots/${shoot.id}`}
                 className="after:absolute after:inset-0 after:content-['']"
               >
-                {project.name}
+                {shoot.name}
               </Link>
             </h3>
             {company && (
@@ -86,29 +86,29 @@ export function ProjectCard({
         </div>
 
         {size === 'lg' && (
-          <p className="line-clamp-2 text-sm text-pretty text-ink-muted">{project.summary}</p>
+          <p className="line-clamp-2 text-sm text-pretty text-ink-muted">{shoot.summary}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <StageBadge stage={project.stage} />
-          <DueBadge date={project.dueDate} />
+          <StageBadge stageId={shoot.stageId} />
+          <DueBadge date={shoot.expectedCloseDate} />
         </div>
 
-        {size === 'lg' && <TagList ids={project.tags} max={3} />}
+        {size === 'lg' && <TagList ids={shoot.tags} max={3} />}
 
         <div className="mt-auto flex flex-col gap-3 pt-1">
           <div>
             <div className="mb-1.5 flex items-baseline justify-between text-xs text-ink-muted">
-              <span>Budget</span>
+              <span>Collected</span>
               <span className="tabular">
-                {formatCurrency(project.spent, { compact: true })} of{' '}
-                {formatCurrency(project.budget, { compact: true })}
+                {formatCurrency(vitals.money.received, { compact: true })} of{' '}
+                {formatCurrency(vitals.money.quoted, { compact: true })}
               </span>
             </div>
             <Meter
-              value={vitals.budgetUsed}
-              tone={vitals.budgetUsed > 0.95 ? 'critical' : vitals.budgetUsed > 0.8 ? 'caution' : 'ink'}
-              label={`Budget used: ${Math.round(vitals.budgetUsed * 100)}%`}
+              value={vitals.collected}
+              tone={vitals.money.overdue.length > 0 ? 'critical' : vitals.collected >= 1 ? 'lime' : 'ink'}
+              label={`${Math.round(vitals.collected * 100)}% of the quote collected`}
             />
           </div>
 
@@ -125,7 +125,7 @@ export function ProjectCard({
                   <span className="tabular">{vitals.openTasks}</span>
                 </span>
               )}
-              {lead && <span className="truncate">{lead.name.split(' ')[0]}</span>}
+              {owner && <span className="truncate">{owner.name.split(' ')[0]}</span>}
             </div>
           </div>
         </div>
@@ -134,12 +134,12 @@ export function ProjectCard({
   )
 }
 
-/** Compact row used by the list view and by related-project sidebars. */
-export function ProjectRow({ project }: { project: Project }) {
-  const company = useStore((s) => s.companies.find((c) => c.id === project.companyId))
+/** Compact row used by the list view and by related-shoot sidebars. */
+export function ShootRow({ shoot }: { shoot: Shoot }) {
+  const company = useStore((s) => s.companies.find((c) => c.id === shoot.companyId))
   const team = useStore((s) => s.team)
-  const vitals = useProjectVitals(project.id)
-  const members = team.filter((m) => project.memberIds.includes(m.id))
+  const vitals = useShootVitals(shoot.id)
+  const members = team.filter((m) => shoot.memberIds.includes(m.id))
 
   return (
     <Card
@@ -149,8 +149,8 @@ export function ProjectRow({ project }: { project: Project }) {
       className="group relative flex items-center gap-4 p-3 transition-shadow duration-base hover:shadow-md"
     >
       <Img
-        src={project.coverUrl}
-        seed={project.artSeed}
+        src={shoot.coverUrl}
+        seed={shoot.artSeed}
         alt=""
         ratio={1}
         className="w-14 shrink-0 rounded-lg sm:w-16"
@@ -159,11 +159,11 @@ export function ProjectRow({ project }: { project: Project }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-medium">
-            <Link to={`/projects/${project.id}`} className="after:absolute after:inset-0 after:content-['']">
-              {project.name}
+            <Link to={`/shoots/${shoot.id}`} className="after:absolute after:inset-0 after:content-['']">
+              {shoot.name}
             </Link>
           </h3>
-          <span className="tabular shrink-0 text-xs text-ink-faint">{project.code}</span>
+          <span className="tabular shrink-0 text-xs text-ink-faint">{shoot.code}</span>
         </div>
         <p className="mt-0.5 truncate text-sm text-ink-muted">
           {company?.name}
@@ -173,14 +173,18 @@ export function ProjectRow({ project }: { project: Project }) {
       </div>
 
       <div className="hidden shrink-0 items-center gap-2 md:flex">
-        <StageBadge stage={project.stage} />
-        {project.health !== 'on-track' && <HealthBadge health={project.health} />}
+        <StageBadge stageId={shoot.stageId} />
+        {shoot.health !== 'on-track' && <HealthBadge health={shoot.health} />}
       </div>
 
       <div className="hidden w-28 shrink-0 lg:block">
-        <Meter value={vitals.budgetUsed} tone={vitals.budgetUsed > 0.95 ? 'critical' : 'ink'} label="Budget used" />
+        <Meter
+          value={vitals.collected}
+          tone={vitals.money.overdue.length > 0 ? 'critical' : 'ink'}
+          label="Collected"
+        />
         <p className="tabular mt-1 text-right text-2xs text-ink-faint">
-          {formatCurrency(project.budget, { compact: true })}
+          {formatCurrency(vitals.money.quoted, { compact: true })}
         </p>
       </div>
 
@@ -193,16 +197,16 @@ export function ProjectRow({ project }: { project: Project }) {
       </div>
 
       <div className="shrink-0">
-        <DueBadge date={project.dueDate} />
+        <DueBadge date={vitals.nextShootDate ?? shoot.expectedCloseDate} prefix={vitals.nextShootDate ? 'Shoots' : undefined} />
       </div>
     </Card>
   )
 }
 
 /** Small card used on the board view, where vertical space is scarce. */
-export function ProjectBoardCard({ project }: { project: Project }) {
-  const company = useStore((s) => s.companies.find((c) => c.id === project.companyId))
-  const vitals = useProjectVitals(project.id)
+export function ShootBoardCard({ shoot }: { shoot: Shoot }) {
+  const company = useStore((s) => s.companies.find((c) => c.id === shoot.companyId))
+  const vitals = useShootVitals(shoot.id)
 
   return (
     <Card
@@ -211,17 +215,17 @@ export function ProjectBoardCard({ project }: { project: Project }) {
       radius="xl"
       className="group relative overflow-hidden transition-shadow duration-base hover:shadow-md"
     >
-      <Img src={project.coverUrl} seed={project.artSeed} alt="" ratio={16 / 7} className="w-full" />
+      <Img src={shoot.coverUrl} seed={shoot.artSeed} alt="" ratio={16 / 7} className="w-full" />
       <div className="flex flex-col gap-2 p-3.5">
         <h3 className="truncate text-base font-medium">
-          <Link to={`/projects/${project.id}`} className="after:absolute after:inset-0 after:content-['']">
-            {project.name}
+          <Link to={`/shoots/${shoot.id}`} className="after:absolute after:inset-0 after:content-['']">
+            {shoot.name}
           </Link>
         </h3>
         <p className="truncate text-xs text-ink-muted">{company?.name}</p>
         <Meter value={vitals.progress} label="Progress" />
         <div className="flex items-center justify-between gap-2">
-          <DueBadge date={project.dueDate} />
+          <DueBadge date={vitals.nextShootDate ?? shoot.expectedCloseDate} />
           {vitals.overdueTasks > 0 && (
             <span className="flex items-center gap-1 text-2xs text-critical">
               <MessageSquare size={10} aria-hidden />

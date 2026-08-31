@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type QuickAddMode = 'task' | 'project' | 'contact' | 'deal' | 'log'
+export type QuickAddMode = 'task' | 'shoot' | 'contact' | 'log'
 
 /**
  * Ephemeral UI state that several unrelated screens need to reach — the quick-

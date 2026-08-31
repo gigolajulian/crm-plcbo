@@ -1,8 +1,9 @@
 import {
   Activity,
-  Briefcase,
+  Camera,
   CheckSquare,
-  Handshake,
+  Receipt,
+  Scale,
   LayoutGrid,
   Images,
   PieChart,
@@ -27,11 +28,12 @@ export interface NavItem {
  */
 export const NAV: NavItem[] = [
   { to: '/', label: 'Today', icon: LayoutGrid, key: 'h', group: 'work' },
-  { to: '/projects', label: 'Projects', icon: Briefcase, key: 'p', group: 'work' },
+  { to: '/shoots', label: 'Shoots', icon: Camera, key: 'p', group: 'work' },
   { to: '/moodboards', label: 'Moodboards', icon: Images, key: 'm', group: 'work' },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare, key: 't', group: 'work' },
   { to: '/approvals', label: 'Approvals', icon: Stamp, key: 'r', group: 'work' },
-  { to: '/deals', label: 'Pipeline', icon: Handshake, key: 'd', group: 'relationships' },
+  { to: '/billing', label: 'Billing', icon: Receipt, key: 'b', group: 'work' },
+  { to: '/licences', label: 'Licences', icon: Scale, key: 'l', group: 'work' },
   { to: '/contacts', label: 'Clients', icon: Users, key: 'c', group: 'relationships' },
   { to: '/activity', label: 'Activity', icon: Activity, key: 'a', group: 'relationships' },
   { to: '/reports', label: 'Reports', icon: PieChart, key: 'e', group: 'studio' },

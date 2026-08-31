@@ -1,7 +1,13 @@
 /* ============================================================================
    CRMO — DOMAIN MODEL
-   Records reference each other by id only. Every derived figure (health,
-   pipeline totals, workload) is computed in store/selectors.ts, never stored.
+
+   A photography business. One Shoot record carries a job from first inquiry
+   through quote, deposit, shoot day, edit, delivery and on into the licence
+   term — because that is one job, not two.
+
+   Records reference each other by id only. Every derived figure (totals,
+   balance due, health, workload) is computed in store/selectors.ts, never
+   stored, so a quote edit can never desync from what was invoiced.
    ========================================================================== */
 
 export type ID = string
@@ -39,6 +45,8 @@ export interface Contact {
   notes: string
   lastTouchedAt: ISODate
   favourite: boolean
+  /** Pasted Gmail thread permalink. No OAuth — see README. */
+  gmailThreadUrl?: string
 }
 
 export interface Company {
@@ -55,17 +63,53 @@ export interface Company {
   since: ISODate
 }
 
-/* ----------------------------------------------------------- projects --- */
+/* ------------------------------------------------------ lead sourcing --- */
 
-export type ProjectStage =
-  | 'discovery'
-  | 'concept'
-  | 'production'
-  | 'review'
-  | 'delivery'
-  | 'complete'
+/** Where work comes from. Structured rather than free text so it can be reported on. */
+export interface LeadSource {
+  id: ID
+  label: string
+  category: 'referral' | 'direct' | 'social' | 'agency' | 'repeat' | 'other'
+  active: boolean
+}
 
-export type ProjectHealth = 'on-track' | 'at-risk' | 'blocked'
+/* ------------------------------------------------------------- shoots --- */
+
+export type ShootType = 'editorial' | 'event' | 'portrait' | 'commercial' | 'product'
+
+export type ShootHealth = 'on-track' | 'at-risk' | 'blocked'
+
+/** Contract and model-release progress. The signed file lives on an Asset. */
+export type PaperworkStatus = 'none' | 'sent' | 'signed' | 'not-required'
+
+/**
+ * A priced line on a quote or invoice. `kind` is what makes revenue
+ * reportable by type — licensing income is the number worth watching.
+ */
+export type LineItemKind = 'shoot-fee' | 'post' | 'licensing' | 'studio'
+
+export interface LineItem {
+  id: ID
+  kind: LineItemKind
+  desc: string
+  qty: number
+  rate: number
+}
+
+/** A day on the calendar. A shoot can span several. */
+export interface ShootDate {
+  id: ID
+  date: ISODate
+  /** Local times, HH:MM. */
+  callTime?: string
+  wrapTime?: string
+  /** A hold that is not yet confirmed — shown dashed on the calendar. */
+  tentative: boolean
+  /** Outdoor days get sunset and weather; indoor ones do not. */
+  outdoor: boolean
+  locationId?: ID
+  note?: string
+}
 
 export interface Brief {
   objective: string
@@ -75,48 +119,145 @@ export interface Brief {
   successCriteria: string[]
 }
 
+/**
+ * What was contracted versus what has actually gone out, and how many of the
+ * included revision rounds have been used. Both halves matter: the first is
+ * whether the job is done, the second is whether it is still profitable.
+ */
 export interface Deliverable {
   id: ID
   name: string
-  quantity: string
-  done: boolean
+  contracted: number
+  delivered: number
+  revisionsIncluded: number
+  revisionsUsed: number
 }
 
-export interface Project {
+export interface Shoot {
   id: ID
   name: string
-  /** Short code shown on cards and in search, e.g. "AUR-01". */
+  /** Short code shown on cards and in search, e.g. "MRW-01". */
   code: string
   summary: string
-  clientContactId: ID
+  contactId: ID
   companyId: ID
   coverUrl?: string
   artSeed: string
-  stage: ProjectStage
-  health: ProjectHealth
-  leadId: ID
+  /** Position in the full lifecycle. Stages are user-editable. */
+  stageId: ID
+  health: ShootHealth
+  shootType: ShootType
+  ownerId: ID
   memberIds: ID[]
-  startDate: ISODate
-  dueDate: ISODate
-  budget: number
-  spent: number
+
+  /* sales */
+  leadSourceId?: ID
+  /** Set when the lead came from a person rather than a channel. */
+  referredByContactId?: ID
+  probability: number
+  inquiredAt: ISODate
+  quotedAt?: ISODate
+
+  /* money — totals are derived, never stored */
+  lineItems: LineItem[]
+  /** Percentage taken up front, 0–100. */
+  depositPct: number
+  expectedCloseDate: ISODate
+
+  /* schedule */
+  shootDates: ShootDate[]
+  locationIds: ID[]
+  talentIds: ID[]
+
+  /* production */
   deliverables: Deliverable[]
+  promisedTurnaroundDays?: number
+  deliveredAt?: ISODate
+  galleryUrl?: string
+  galleryExpiresAt?: ISODate
+  /** Where the catalog lives on disk, so it can be found a year later. */
+  catalogPath?: string
+
+  /* paperwork */
+  contractStatus: PaperworkStatus
+  releaseStatus: PaperworkStatus
+  contractAssetId?: ID
+  releaseAssetId?: ID
+
+  gmailThreadUrl?: string
   tags: ID[]
   brief: Brief
-  dealId?: ID
+  notes: string
   archived: boolean
   createdAt: ISODate
+  /** Set when the shoot enters a won/lost stage. */
+  closedAt?: ISODate
 }
 
 export type MilestoneStatus = 'upcoming' | 'in-progress' | 'done' | 'missed'
 
 export interface Milestone {
   id: ID
-  projectId: ID
+  shootId: ID
   name: string
   date: ISODate
   status: MilestoneStatus
   note?: string
+}
+
+/* ------------------------------------------------------------ licences --- */
+
+export type LicenseStatus = 'active' | 'expiring' | 'expired' | 'renewed' | 'lapsed'
+
+/**
+ * Usage rights sold on a shoot. The end date is the point of the record —
+ * an expiring licence is renewal revenue that would otherwise walk away.
+ */
+export interface License {
+  id: ID
+  shootId: ID
+  companyId: ID
+  name: string
+  /** Plain-language scope, e.g. "Web and paid social, North America". */
+  scope: string
+  media: string[]
+  territory: string
+  startDate: ISODate
+  endDate: ISODate
+  fee: number
+  exclusive: boolean
+  status: LicenseStatus
+  assetIds: ID[]
+  notes: string
+  createdAt: ISODate
+}
+
+/* ------------------------------------------------------------ invoices --- */
+
+export type InvoiceKind = 'deposit' | 'balance' | 'full'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'void'
+
+/**
+ * A document, not a view onto the shoot. `lineItems` is a snapshot taken when
+ * the invoice is raised — editing the quote afterwards must never rewrite an
+ * invoice that has already gone out.
+ */
+export interface Invoice {
+  id: ID
+  shootId: ID
+  /** MMYY, with a sequence suffix when a month has more than one. */
+  number: string
+  kind: InvoiceKind
+  lineItems: LineItem[]
+  status: InvoiceStatus
+  issuedAt?: ISODate
+  dueAt?: ISODate
+  paidAt?: ISODate
+  notes: string
+  signoff: string
+  /** Which of the two paper treatments the document was drawn on. */
+  paper: 'light' | 'inverted'
+  createdAt: ISODate
 }
 
 /* -------------------------------------------------------------- tasks --- */
@@ -132,8 +273,7 @@ export interface Task {
   priority: TaskPriority
   dueDate?: ISODate
   assigneeId?: ID
-  projectId?: ID
-  dealId?: ID
+  shootId?: ID
   contactId?: ID
   /** A reminder is a follow-up nudge, shown on the dashboard. */
   reminderAt?: ISODate
@@ -141,35 +281,30 @@ export interface Task {
   completedAt?: ISODate
 }
 
-/* -------------------------------------------------------------- deals --- */
+/* --------------------------------------------------------- lifecycle --- */
+
+/**
+ * What a stage *means*, so selectors never have to match on its name. The
+ * stages themselves are user-editable; these kinds are what the app reasons
+ * about — whether to count the money, show it on the board, chase a reply.
+ */
+export type StageKind =
+  | 'lead'
+  | 'quoted'
+  | 'booked'
+  | 'production'
+  | 'delivered'
+  | 'licensing'
+  | 'won'
+  | 'lost'
 
 export interface PipelineStage {
   id: ID
   name: string
   order: number
-  /** Default win probability applied to deals entering this stage. */
+  /** Default win probability applied to shoots entering this stage. */
   probability: number
-  /** 'won' and 'lost' stages close a deal and are excluded from open pipeline. */
-  kind: 'open' | 'won' | 'lost'
-}
-
-export interface Deal {
-  id: ID
-  name: string
-  companyId: ID
-  contactId: ID
-  stageId: ID
-  value: number
-  probability: number
-  expectedCloseDate: ISODate
-  ownerId: ID
-  projectId?: ID
-  source: string
-  notes: string
-  tags: ID[]
-  createdAt: ISODate
-  /** Set when the deal enters a won/lost stage. */
-  closedAt?: ISODate
+  kind: StageKind
 }
 
 /* --------------------------------------------------------- moodboards --- */
@@ -236,7 +371,7 @@ export interface MoodSection {
 
 export interface Moodboard {
   id: ID
-  projectId: ID
+  shootId: ID
   title: string
   updatedAt: ISODate
 }
@@ -264,14 +399,14 @@ export interface AssetVersion {
 
 export interface Asset {
   id: ID
-  projectId: ID
+  shootId: ID
   name: string
-  kind: 'design' | 'video' | 'copy' | 'document' | 'photo'
+  kind: 'photo' | 'video' | 'document' | 'contract' | 'release'
   currentVersionId: ID
   createdAt: ISODate
 }
 
-export type CommentTarget = 'assetVersion' | 'project' | 'moodItem'
+export type CommentTarget = 'assetVersion' | 'shoot' | 'moodItem'
 
 export interface Comment {
   id: ID
@@ -298,7 +433,8 @@ export type ActivityType =
   | 'update'
   | 'approval'
   | 'task'
-  | 'deal'
+  | 'invoice'
+  | 'license'
 
 export interface ActivityEvent {
   id: ID
@@ -311,13 +447,16 @@ export interface ActivityEvent {
   /** Direction for communication types. */
   direction?: 'inbound' | 'outbound'
   links: {
-    projectId?: ID
+    shootId?: ID
     contactId?: ID
     companyId?: ID
-    dealId?: ID
     taskId?: ID
     assetVersionId?: ID
+    invoiceId?: ID
+    licenseId?: ID
   }
+  /** A pasted Gmail permalink, when this entry records an email exchange. */
+  threadUrl?: string
   /** Follow-ups appear on the dashboard until cleared. */
   followUpAt?: ISODate
   followUpDone?: boolean
@@ -338,7 +477,7 @@ export interface CustomField {
   id: ID
   label: string
   type: CustomFieldType
-  entity: 'project' | 'contact' | 'company' | 'deal'
+  entity: 'shoot' | 'contact' | 'company'
   options?: string[]
   required: boolean
 }
@@ -346,16 +485,17 @@ export interface CustomField {
 export interface NotificationPrefs {
   approvalRequests: boolean
   taskAssignments: boolean
-  dealStageChanges: boolean
+  stageChanges: boolean
   milestoneReminders: boolean
   clientReplies: boolean
+  licenceExpiry: boolean
   weeklyDigest: boolean
   channel: 'email' | 'in-app' | 'both'
 }
 
 export interface SavedView {
   id: ID
-  scope: 'projects' | 'deals' | 'contacts' | 'tasks'
+  scope: 'shoots' | 'contacts' | 'tasks' | 'invoices' | 'licenses'
   name: string
   filters: Record<string, string[] | string>
   sort?: string
@@ -366,9 +506,28 @@ export interface SavedView {
 export type Accent = 'lime' | 'amber' | 'coral' | 'sky' | 'iris'
 
 /**
+ * Billing identity — everything the document engine needs to letterhead an
+ * invoice. Entered once here rather than retyped per document.
+ */
+export interface BillingProfile {
+  businessName: string
+  addressLines: string[]
+  email: string
+  phone: string
+  /** Tax id as it should print, e.g. "EIN #: 00-0000000". */
+  taxId: string
+  /** Square PNG/SVG data URL used as the document mark. */
+  logoDataUrl?: string
+  defaultNotes: string
+  defaultSignoff: string
+  /** Default deposit percentage applied to a new shoot. */
+  depositPct: number
+  /** Days from issue to due on a new invoice. */
+  paymentTermsDays: number
+}
+
+/**
  * The workspace's own identity, set during setup and editable in Settings.
- * This is a local profile, not an authenticated account — there is no server
- * and no password; see the README.
  */
 export interface Workspace {
   /** Studio name, shown in the nav, settings and page copy. */
@@ -383,6 +542,10 @@ export interface Workspace {
   accent: Accent
   currency: string
   locale: string
+  /** Home base, used for sunset times when a shoot has no location of its own. */
+  latitude?: number
+  longitude?: number
+  billing: BillingProfile
   /** False until setup has been completed once. */
   onboarded: boolean
 }
@@ -397,8 +560,7 @@ export interface Settings {
 
 /* ------------------------------------------------------- ui view state --- */
 
-export type ProjectView = 'gallery' | 'board' | 'timeline' | 'list'
-export type DealView = 'board' | 'list'
+export type ShootView = 'gallery' | 'board' | 'timeline' | 'list'
 export type TaskBucket = 'today' | 'upcoming' | 'overdue' | 'completed'
 
 /** Shape of the whole persisted database. */
@@ -406,10 +568,12 @@ export interface Database {
   team: TeamMember[]
   companies: Company[]
   contacts: Contact[]
-  projects: Project[]
+  leadSources: LeadSource[]
+  shoots: Shoot[]
   milestones: Milestone[]
   tasks: Task[]
-  deals: Deal[]
+  licenses: License[]
+  invoices: Invoice[]
   pipeline: PipelineStage[]
   moodboards: Moodboard[]
   moodSections: MoodSection[]
@@ -426,19 +590,64 @@ export interface Database {
 
 /* --------------------------------------------------------- label maps --- */
 
-export const PROJECT_STAGES: Array<{ id: ProjectStage; label: string; hint: string }> = [
-  { id: 'discovery', label: 'Discovery', hint: 'Understanding the problem' },
-  { id: 'concept', label: 'Concept', hint: 'Exploring directions' },
-  { id: 'production', label: 'Production', hint: 'Making the work' },
-  { id: 'review', label: 'Review', hint: 'With the client' },
-  { id: 'delivery', label: 'Delivery', hint: 'Handing over' },
-  { id: 'complete', label: 'Complete', hint: 'Wrapped and archived' },
+export const SHOOT_TYPES: Array<{ id: ShootType; label: string; hint: string }> = [
+  { id: 'editorial', label: 'Editorial', hint: 'Magazine and press' },
+  { id: 'commercial', label: 'Commercial', hint: 'Brand and advertising' },
+  { id: 'portrait', label: 'Portrait', hint: 'People and headshots' },
+  { id: 'event', label: 'Event', hint: 'Live coverage' },
+  { id: 'product', label: 'Product', hint: 'Studio and still life' },
 ]
 
-export const PROJECT_HEALTH: Record<ProjectHealth, { label: string; tone: string }> = {
+export const LINE_ITEM_KINDS: Array<{ id: LineItemKind; label: string; hint: string }> = [
+  { id: 'shoot-fee', label: 'Shoot fee', hint: 'Day rate and crew' },
+  { id: 'post', label: 'Post-production', hint: 'Editing and retouching' },
+  { id: 'licensing', label: 'Usage licensing', hint: 'Rights granted' },
+  { id: 'studio', label: 'Studio & expenses', hint: 'Passed through at cost' },
+]
+
+export const SHOOT_HEALTH: Record<ShootHealth, { label: string; tone: string }> = {
   'on-track': { label: 'On track', tone: 'positive' },
   'at-risk': { label: 'At risk', tone: 'caution' },
   blocked: { label: 'Blocked', tone: 'critical' },
+}
+
+export const PAPERWORK_STATUS: Record<PaperworkStatus, { label: string; tone: string }> = {
+  none: { label: 'Not sent', tone: 'critical' },
+  sent: { label: 'Awaiting signature', tone: 'caution' },
+  signed: { label: 'Signed', tone: 'positive' },
+  'not-required': { label: 'Not required', tone: 'neutral' },
+}
+
+export const LICENSE_STATUS: Record<LicenseStatus, { label: string; tone: string }> = {
+  active: { label: 'Active', tone: 'positive' },
+  expiring: { label: 'Expiring', tone: 'caution' },
+  expired: { label: 'Expired', tone: 'critical' },
+  renewed: { label: 'Renewed', tone: 'positive' },
+  lapsed: { label: 'Lapsed', tone: 'neutral' },
+}
+
+export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: string }> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  sent: { label: 'Sent', tone: 'caution' },
+  paid: { label: 'Paid', tone: 'positive' },
+  void: { label: 'Void', tone: 'neutral' },
+}
+
+export const INVOICE_KINDS: Record<InvoiceKind, string> = {
+  deposit: 'Deposit',
+  balance: 'Balance',
+  full: 'Full amount',
+}
+
+export const STAGE_KINDS: Record<StageKind, { label: string; hint: string }> = {
+  lead: { label: 'Lead', hint: 'Enquiry in, nothing sent yet' },
+  quoted: { label: 'Quoted', hint: 'Waiting on a reply — follow-ups run from here' },
+  booked: { label: 'Booked', hint: 'Deposit taken, work is committed' },
+  production: { label: 'In production', hint: 'Shooting or editing' },
+  delivered: { label: 'Delivered', hint: 'Finals are out' },
+  licensing: { label: 'Licensing', hint: 'Rights are live and worth watching' },
+  won: { label: 'Closed won', hint: 'Counts as revenue' },
+  lost: { label: 'Closed lost', hint: 'Leaves the board' },
 }
 
 export const TASK_PRIORITIES: Array<{ id: TaskPriority; label: string }> = [
@@ -461,10 +670,11 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   meeting: 'Meeting',
   note: 'Note',
   status: 'Status change',
-  update: 'Project update',
+  update: 'Shoot update',
   approval: 'Approval',
   task: 'Task',
-  deal: 'Deal',
+  invoice: 'Invoice',
+  license: 'Licence',
 }
 
 export const MOOD_KIND_LABELS: Record<MoodItemKind, string> = {

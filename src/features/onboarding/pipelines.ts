@@ -61,7 +61,7 @@ export function buildPipeline(stages: Array<{ name: string; probability: number 
       name: stage.name.trim(),
       order: index,
       probability: stage.probability,
-      kind: 'open' as const,
+      kind: 'production' as const,
     }))
 
   return [

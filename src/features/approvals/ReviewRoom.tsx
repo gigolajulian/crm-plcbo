@@ -23,10 +23,10 @@ import { canUpload } from '@/lib/uploads'
    ========================================================================== */
 
 export function ReviewRoom({
-  projectId,
+  shootId,
   assetIds,
 }: {
-  projectId?: ID
+  shootId?: ID
   /** Restrict to these assets; omit to review everything. */
   assetIds?: ID[]
 }) {
@@ -35,7 +35,7 @@ export function ReviewRoom({
   const comments = useStore((s) => s.comments)
   const team = useStore((s) => s.team)
   const contacts = useStore((s) => s.contacts)
-  const projects = useStore((s) => s.projects)
+  const projects = useStore((s) => s.shoots)
 
   const setVersionStatus = useStore((s) => s.setVersionStatus)
   const addComment = useStore((s) => s.addComment)
@@ -46,11 +46,11 @@ export function ReviewRoom({
   const assets = useMemo(() => {
     const list = assetIds
       ? allAssets.filter((a) => assetIds.includes(a.id))
-      : projectId
-        ? allAssets.filter((a) => a.projectId === projectId)
+      : shootId
+        ? allAssets.filter((a) => a.shootId === shootId)
         : allAssets
     return sortBy(list, (a) => a.createdAt, -1)
-  }, [allAssets, assetIds, projectId])
+  }, [allAssets, assetIds, shootId])
 
   const [selectedAssetId, setSelectedAssetId] = useState<ID | null>(assets[0]?.id ?? null)
   const [selectedVersionId, setSelectedVersionId] = useState<ID | null>(null)
@@ -99,15 +99,15 @@ export function ReviewRoom({
         title="Nothing to review yet"
         body="Upload a version of the work and the client can comment, approve, or ask for changes — with the whole history kept."
         action={
-          projectId ? (
+          shootId ? (
             <Button
               variant="primary"
               icon={<Plus size={16} />}
               onClick={() => {
                 useStore.getState().addAsset({
-                  projectId,
+                  shootId,
                   name: 'New deliverable',
-                  kind: 'design',
+                  kind: 'photo',
                   versionUrl: fromSet('studio', 0, 'card'),
                 })
                 toast.success('Draft version created')
@@ -193,16 +193,16 @@ export function ReviewRoom({
           })}
         </ul>
 
-        {projectId && (
+        {shootId && (
           <Button
             block
             className="mt-3"
             icon={<Plus size={15} />}
             onClick={() => {
               useStore.getState().addAsset({
-                projectId,
+                shootId,
                 name: 'New deliverable',
-                kind: 'design',
+                kind: 'photo',
                 versionUrl: photo(PHOTO_SETS.studio[3], 'card'),
               })
               toast.success('Deliverable added')
@@ -220,7 +220,7 @@ export function ReviewRoom({
             <div className="min-w-0">
               <h3 className="truncate text-lg font-medium tracking-tight">{asset.name}</h3>
               <p className="text-sm text-ink-muted">
-                {projects.find((p) => p.id === asset.projectId)?.name}
+                {projects.find((p) => p.id === asset.shootId)?.name}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

@@ -18,16 +18,14 @@ import {
   TagList,
   TaskCheck,
 } from '@/components/common/records'
-import { ProjectRow } from '@/features/projects/ProjectCard'
+import { ShootRow } from '@/features/shoots/ShootCard'
 
 export default function ContactDetail() {
   const { id = '' } = useParams()
   const contact = useContact(id)
   const company = useStore((s) => s.companies.find((c) => c.id === contact?.companyId))
-  const allProjects = useStore((s) => s.projects)
-  const allDeals = useStore((s) => s.deals)
+  const allProjects = useStore((s) => s.shoots)
   const allTasks = useStore((s) => s.tasks)
-  const pipeline = useStore((s) => s.pipeline)
   const updateContact = useStore((s) => s.updateContact)
   const toggleTask = useStore((s) => s.toggleTask)
   const openQuickAdd = useUI((s) => s.openQuickAdd)
@@ -36,11 +34,10 @@ export default function ContactDetail() {
   const [editing, setEditing] = useState<'notes' | 'prefs' | null>(null)
   const [draft, setDraft] = useState('')
 
-  const projects = useMemo(
-    () => allProjects.filter((p) => p.clientContactId === id),
+  const contactShoots = useMemo(
+    () => allProjects.filter((p) => p.contactId === id),
     [allProjects, id],
   )
-  const deals = useMemo(() => allDeals.filter((d) => d.contactId === id), [allDeals, id])
   const tasks = useMemo(() => allTasks.filter((t) => t.contactId === id), [allTasks, id])
 
   if (!contact) {
@@ -250,63 +247,24 @@ export default function ContactDetail() {
         {/* ------------------------------------------------------- right */}
         <div className="flex flex-col gap-5">
           <section>
-            <SectionHeading title="Projects" count={projects.length} />
-            {projects.length === 0 ? (
+            <SectionHeading title="Projects" count={contactShoots.length} />
+            {contactShoots.length === 0 ? (
               <EmptyState
-                title="No projects with this client yet"
+                title="No contactShoots with this client yet"
                 body="When a deal is won, start the project here."
                 size="sm"
               />
             ) : (
               <ul className="flex flex-col gap-2">
-                {projects.map((project) => (
-                  <li key={project.id}>
-                    <ProjectRow project={project} />
+                {contactShoots.map((shoot) => (
+                  <li key={shoot.id}>
+                    <ShootRow shoot={shoot} />
                   </li>
                 ))}
               </ul>
             )}
           </section>
 
-          <section>
-            <SectionHeading title="Deals" count={deals.length} />
-            {deals.length === 0 ? (
-              <p className="rounded-2xl bg-surface px-4 py-6 text-center text-sm text-ink-muted">
-                No deals with this contact.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {deals.map((deal) => {
-                  const stage = pipeline.find((s) => s.id === deal.stageId)
-                  return (
-                    <li key={deal.id}>
-                      <Card
-                        variant="raised"
-                        padding="sm"
-                        radius="xl"
-                        className="relative flex items-center gap-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-medium">
-                            <LinkedRecord kind="deal" id={deal.id} className="text-ink" />
-                          </p>
-                          <p className="text-xs text-ink-muted">{stage?.name}</p>
-                        </div>
-                        <span className="tabular shrink-0 text-base">
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                            notation: 'compact',
-                            maximumFractionDigits: 0,
-                          }).format(deal.value)}
-                        </span>
-                      </Card>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </section>
 
           <Card variant="raised" padding="lg" radius="2xl">
             <SectionHeading
@@ -350,8 +308,8 @@ export default function ContactDetail() {
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-xs text-ink-faint">
                         <span>{formatRelativeTime(event.at)}</span>
                         {event.direction && <span>{event.direction}</span>}
-                        {event.links.projectId && (
-                          <LinkedRecord kind="project" id={event.links.projectId} size="sm" />
+                        {event.links.shootId && (
+                          <LinkedRecord kind="shoot" id={event.links.shootId} size="sm" />
                         )}
                       </div>
                     </div>

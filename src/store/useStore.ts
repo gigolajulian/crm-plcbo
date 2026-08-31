@@ -10,15 +10,18 @@ import type {
   Company,
   Contact,
   Database,
-  Deal,
   ID,
+  Invoice,
+  LeadSource,
+  License,
+  LineItem,
   Milestone,
   MoodItem,
   MoodSection,
   PipelineStage,
-  Project,
   SavedView,
   Settings,
+  Shoot,
   Tag,
   Task,
   Workspace,
@@ -27,17 +30,24 @@ import { createEmptyDatabase, createSeedDatabase } from '@/data/seed'
 import { arrayMove, toISODate, uid } from '@/lib/utils'
 import { setMoneyFormat } from '@/lib/intl'
 import { generatePortrait } from '@/lib/art'
+import { migrateToV4 } from './migrations'
+import { EMPTY_BILLING } from '@/data/defaults'
+import { isClosed } from '@/data/pipeline'
 
 const STORAGE_KEY = 'crmo/v1'
 
 /* ------------------------------------------------------------------------ */
 
 type Actions = {
-  /* projects */
-  addProject: (draft: Partial<Project> & Pick<Project, 'name' | 'companyId' | 'clientContactId'>) => ID
-  updateProject: (id: ID, patch: Partial<Project>) => void
-  deleteProject: (id: ID) => void
-  setProjectStage: (id: ID, stage: Project['stage']) => void
+  /* shoots */
+  addShoot: (draft: Partial<Shoot> & Pick<Shoot, 'name' | 'companyId' | 'contactId'>) => ID
+  updateShoot: (id: ID, patch: Partial<Shoot>) => void
+  deleteShoot: (id: ID) => void
+  /** Move along the lifecycle. Handles probability and the closed date. */
+  moveShoot: (id: ID, stageId: ID) => void
+  addLineItem: (shootId: ID, draft?: Partial<LineItem>) => ID
+  updateLineItem: (shootId: ID, itemId: ID, patch: Partial<LineItem>) => void
+  deleteLineItem: (shootId: ID, itemId: ID) => void
 
   /* milestones */
   addMilestone: (milestone: Omit<Milestone, 'id'>) => ID
@@ -52,11 +62,19 @@ type Actions = {
   updateCompany: (id: ID, patch: Partial<Company>) => void
   deleteCompany: (id: ID) => void
 
-  /* deals */
-  addDeal: (draft: Partial<Deal> & Pick<Deal, 'name' | 'companyId' | 'contactId'>) => ID
-  updateDeal: (id: ID, patch: Partial<Deal>) => void
-  deleteDeal: (id: ID) => void
-  moveDeal: (id: ID, stageId: ID) => void
+  /* licences, invoices & lead sources */
+  addLicense: (draft: Partial<License> & Pick<License, 'shootId'>) => ID
+  updateLicense: (id: ID, patch: Partial<License>) => void
+  deleteLicense: (id: ID) => void
+
+  addInvoice: (shootId: ID, kind: Invoice['kind']) => ID
+  updateInvoice: (id: ID, patch: Partial<Invoice>) => void
+  deleteInvoice: (id: ID) => void
+  markInvoicePaid: (id: ID, paidAt?: string) => void
+
+  addLeadSource: (label: string, category?: LeadSource['category']) => ID
+  updateLeadSource: (id: ID, patch: Partial<LeadSource>) => void
+  deleteLeadSource: (id: ID) => void
 
   /* tasks */
   addTask: (draft: Partial<Task> & Pick<Task, 'title'>) => ID
@@ -75,7 +93,7 @@ type Actions = {
   addMoodSection: (boardId: ID, title: string) => ID
   updateMoodSection: (id: ID, patch: Partial<MoodSection>) => void
   deleteMoodSection: (id: ID) => void
-  ensureMoodboard: (projectId: ID) => ID
+  ensureMoodboard: (shootId: ID) => ID
 
   /* assets, versions, approvals */
   addAssetVersion: (assetId: ID, draft: Partial<AssetVersion>) => ID
@@ -126,6 +144,17 @@ function patchIn<T extends { id: ID }>(list: T[], id: ID, patch: Partial<T>): T[
   return list.map((item) => (item.id === id ? { ...item, ...patch } : item))
 }
 
+/**
+ * MMYY, the scheme the studio already uses — with a suffix once a month has
+ * more than one invoice, so two in August cannot both be "0826".
+ */
+function nextInvoiceNumber(invoices: Invoice[], issuedAt: string): string {
+  const [year, month] = issuedAt.split('-')
+  const stem = `${month}${year.slice(2)}`
+  const taken = invoices.filter((inv) => inv.number === stem || inv.number.startsWith(`${stem}-`))
+  return taken.length === 0 ? stem : `${stem}-${taken.length + 1}`
+}
+
 /* -------------------------------------------------------------------- store */
 
 export const useStore = create<Store>()(
@@ -133,28 +162,53 @@ export const useStore = create<Store>()(
     (set, get) => ({
       ...createSeedDatabase(),
 
-      /* ---------------------------------------------------------- projects */
+      /* ------------------------------------------------------------ shoots */
 
-      addProject: (draft) => {
-        const id = uid('pj')
-        const project: Project = {
+      addShoot: (draft) => {
+        const id = uid('sh')
+        const { pipeline, settings } = get()
+        const stageId = draft.stageId ?? pipeline[0]?.id
+        const stage = pipeline.find((p) => p.id === stageId)
+        const shoot: Shoot = {
           id,
           name: draft.name,
-          code: draft.code ?? `NEW-${get().projects.length + 1}`.padStart(5, '0'),
+          code: draft.code ?? `NEW-${get().shoots.length + 1}`,
           summary: draft.summary ?? '',
-          clientContactId: draft.clientContactId,
+          contactId: draft.contactId,
           companyId: draft.companyId,
           coverUrl: draft.coverUrl,
           artSeed: draft.artSeed ?? `${draft.name}-${id}`,
-          stage: draft.stage ?? 'discovery',
+          stageId,
           health: draft.health ?? 'on-track',
-          leadId: draft.leadId ?? get().settings.currentUserId,
-          memberIds: draft.memberIds ?? [get().settings.currentUserId],
-          startDate: draft.startDate ?? today(),
-          dueDate: draft.dueDate ?? today(),
-          budget: draft.budget ?? 0,
-          spent: draft.spent ?? 0,
+          shootType: draft.shootType ?? 'commercial',
+          ownerId: draft.ownerId ?? settings.currentUserId,
+          memberIds: draft.memberIds ?? [settings.currentUserId],
+
+          leadSourceId: draft.leadSourceId,
+          referredByContactId: draft.referredByContactId,
+          probability: draft.probability ?? stage?.probability ?? 10,
+          inquiredAt: draft.inquiredAt ?? today(),
+          quotedAt: draft.quotedAt,
+
+          lineItems: draft.lineItems ?? [],
+          // The studio's usual split, so a new quote starts from the real terms.
+          depositPct: draft.depositPct ?? settings.workspace.billing?.depositPct ?? 50,
+          expectedCloseDate: draft.expectedCloseDate ?? today(),
+
+          shootDates: draft.shootDates ?? [],
+          locationIds: draft.locationIds ?? [],
+          talentIds: draft.talentIds ?? [],
+
           deliverables: draft.deliverables ?? [],
+          promisedTurnaroundDays: draft.promisedTurnaroundDays,
+          galleryUrl: draft.galleryUrl,
+          galleryExpiresAt: draft.galleryExpiresAt,
+          catalogPath: draft.catalogPath,
+
+          contractStatus: draft.contractStatus ?? 'none',
+          releaseStatus: draft.releaseStatus ?? 'none',
+
+          gmailThreadUrl: draft.gmailThreadUrl,
           tags: draft.tags ?? [],
           brief:
             draft.brief ??
@@ -165,53 +219,109 @@ export const useStore = create<Store>()(
               constraints: '',
               successCriteria: [],
             },
-          dealId: draft.dealId,
+          notes: draft.notes ?? '',
           archived: false,
           createdAt: today(),
         }
-        set((s) => ({ projects: [project, ...s.projects] }))
+        set((s) => ({ shoots: [shoot, ...s.shoots] }))
         get().ensureMoodboard(id)
         get().logActivity({
           type: 'update',
-          subject: `Project created — ${project.name}`,
-          actorId: get().settings.currentUserId,
+          subject: `Shoot created — ${shoot.name}`,
+          actorId: settings.currentUserId,
           actorKind: 'team',
-          links: { projectId: id, companyId: project.companyId, contactId: project.clientContactId },
+          links: { shootId: id, companyId: shoot.companyId, contactId: shoot.contactId },
         })
         return id
       },
 
-      updateProject: (id, patch) => set((s) => ({ projects: patchIn(s.projects, id, patch) })),
+      updateShoot: (id, patch) => set((s) => ({ shoots: patchIn(s.shoots, id, patch) })),
 
-      deleteProject: (id) =>
+      deleteShoot: (id) =>
         set((s) => {
-          const boardIds = s.moodboards.filter((b) => b.projectId === id).map((b) => b.id)
-          const assetIds = s.assets.filter((a) => a.projectId === id).map((a) => a.id)
+          const boardIds = s.moodboards.filter((b) => b.shootId === id).map((b) => b.id)
+          const assetIds = s.assets.filter((a) => a.shootId === id).map((a) => a.id)
           return {
-            projects: s.projects.filter((p) => p.id !== id),
-            milestones: s.milestones.filter((m) => m.projectId !== id),
-            tasks: s.tasks.filter((t) => t.projectId !== id),
-            moodboards: s.moodboards.filter((b) => b.projectId !== id),
+            shoots: s.shoots.filter((p) => p.id !== id),
+            milestones: s.milestones.filter((m) => m.shootId !== id),
+            tasks: s.tasks.filter((t) => t.shootId !== id),
+            moodboards: s.moodboards.filter((b) => b.shootId !== id),
             moodSections: s.moodSections.filter((sec) => !boardIds.includes(sec.boardId)),
             moodItems: s.moodItems.filter((i) => !boardIds.includes(i.boardId)),
-            assets: s.assets.filter((a) => a.projectId !== id),
+            assets: s.assets.filter((a) => a.shootId !== id),
             assetVersions: s.assetVersions.filter((v) => !assetIds.includes(v.assetId)),
-            activity: s.activity.filter((a) => a.links.projectId !== id),
+            licenses: s.licenses.filter((l) => l.shootId !== id),
+            invoices: s.invoices.filter((inv) => inv.shootId !== id),
+            activity: s.activity.filter((a) => a.links.shootId !== id),
           }
         }),
 
-      setProjectStage: (id, stage) => {
-        const project = get().projects.find((p) => p.id === id)
-        if (!project || project.stage === stage) return
-        set((s) => ({ projects: patchIn(s.projects, id, { stage }) }))
+      moveShoot: (id, stageId) => {
+        const shoot = get().shoots.find((p) => p.id === id)
+        const stage = get().pipeline.find((p) => p.id === stageId)
+        if (!shoot || !stage || shoot.stageId === stageId) return
+
+        set((s) => ({
+          shoots: patchIn(s.shoots, id, {
+            stageId,
+            probability: stage.probability,
+            closedAt: isClosed(stage.kind) ? today() : undefined,
+            // Entering the quoted stage starts the follow-up clock.
+            quotedAt: stage.kind === 'quoted' ? (shoot.quotedAt ?? today()) : shoot.quotedAt,
+            deliveredAt:
+              stage.kind === 'delivered' ? (shoot.deliveredAt ?? today()) : shoot.deliveredAt,
+          }),
+        }))
         get().logActivity({
           type: 'status',
-          subject: `${project.name} moved to ${stage}`,
+          subject: `${shoot.name} moved to ${stage.name}`,
           actorId: get().settings.currentUserId,
           actorKind: 'team',
-          links: { projectId: id, companyId: project.companyId },
+          links: { shootId: id, companyId: shoot.companyId, contactId: shoot.contactId },
         })
       },
+
+      /* --------------------------------------------------------- line items */
+
+      addLineItem: (shootId, draft) => {
+        const id = uid('li')
+        const item: LineItem = {
+          id,
+          kind: draft?.kind ?? 'shoot-fee',
+          desc: draft?.desc ?? '',
+          qty: draft?.qty ?? 1,
+          rate: draft?.rate ?? 0,
+        }
+        set((s) => ({
+          shoots: s.shoots.map((shoot) =>
+            shoot.id === shootId ? { ...shoot, lineItems: [...shoot.lineItems, item] } : shoot,
+          ),
+        }))
+        return id
+      },
+
+      updateLineItem: (shootId, itemId, patch) =>
+        set((s) => ({
+          shoots: s.shoots.map((shoot) =>
+            shoot.id === shootId
+              ? {
+                  ...shoot,
+                  lineItems: shoot.lineItems.map((item) =>
+                    item.id === itemId ? { ...item, ...patch } : item,
+                  ),
+                }
+              : shoot,
+          ),
+        })),
+
+      deleteLineItem: (shootId, itemId) =>
+        set((s) => ({
+          shoots: s.shoots.map((shoot) =>
+            shoot.id === shootId
+              ? { ...shoot, lineItems: shoot.lineItems.filter((item) => item.id !== itemId) }
+              : shoot,
+          ),
+        })),
 
       /* -------------------------------------------------------- milestones */
 
@@ -285,61 +395,153 @@ export const useStore = create<Store>()(
           contacts: s.contacts.filter((c) => c.companyId !== id),
         })),
 
-      /* ------------------------------------------------------------ deals */
+      /* --------------------------------------------------------- licences */
 
-      addDeal: (draft) => {
-        const id = uid('dl')
-        const pipeline = get().pipeline
-        const stageId = draft.stageId ?? pipeline[0]?.id
-        const stage = pipeline.find((p) => p.id === stageId)
-        const deal: Deal = {
+      addLicense: (draft) => {
+        const id = uid('lc')
+        const shoot = get().shoots.find((s) => s.id === draft.shootId)
+        const license: License = {
           id,
-          name: draft.name,
-          companyId: draft.companyId,
-          contactId: draft.contactId,
-          stageId,
-          value: draft.value ?? 0,
-          probability: draft.probability ?? stage?.probability ?? 10,
-          expectedCloseDate: draft.expectedCloseDate ?? today(),
-          ownerId: draft.ownerId ?? get().settings.currentUserId,
-          projectId: draft.projectId,
-          source: draft.source ?? 'Inbound',
+          shootId: draft.shootId,
+          companyId: draft.companyId ?? shoot?.companyId ?? '',
+          name: draft.name ?? (shoot ? `${shoot.name} — usage` : 'Usage licence'),
+          scope: draft.scope ?? '',
+          media: draft.media ?? [],
+          territory: draft.territory ?? '',
+          startDate: draft.startDate ?? today(),
+          endDate: draft.endDate ?? today(),
+          fee: draft.fee ?? 0,
+          exclusive: draft.exclusive ?? false,
+          status: draft.status ?? 'active',
+          assetIds: draft.assetIds ?? [],
           notes: draft.notes ?? '',
-          tags: draft.tags ?? [],
           createdAt: today(),
         }
-        set((s) => ({ deals: [deal, ...s.deals] }))
+        set((s) => ({ licenses: [license, ...s.licenses] }))
         get().logActivity({
-          type: 'deal',
-          subject: `New deal — ${deal.name}`,
-          actorId: deal.ownerId,
+          type: 'license',
+          subject: `Licence created — ${license.name}`,
+          actorId: get().settings.currentUserId,
           actorKind: 'team',
-          links: { dealId: id, companyId: deal.companyId, contactId: deal.contactId },
+          links: { licenseId: id, shootId: license.shootId, companyId: license.companyId },
         })
         return id
       },
-      updateDeal: (id, patch) => set((s) => ({ deals: patchIn(s.deals, id, patch) })),
-      deleteDeal: (id) => set((s) => ({ deals: s.deals.filter((d) => d.id !== id) })),
+      updateLicense: (id, patch) => set((s) => ({ licenses: patchIn(s.licenses, id, patch) })),
+      deleteLicense: (id) => set((s) => ({ licenses: s.licenses.filter((l) => l.id !== id) })),
 
-      moveDeal: (id, stageId) => {
-        const deal = get().deals.find((d) => d.id === id)
-        const stage = get().pipeline.find((p) => p.id === stageId)
-        if (!deal || !stage || deal.stageId === stageId) return
+      /* --------------------------------------------------------- invoices */
+
+      addInvoice: (shootId, kind) => {
+        const id = uid('in')
+        const { shoots, invoices, settings } = get()
+        const shoot = shoots.find((s) => s.id === shootId)
+        const billing = settings.workspace.billing ?? EMPTY_BILLING
+
+        /*
+         * A deposit bills a percentage of the whole quote, so it is stored as a
+         * single derived line rather than a share of each one — that is what the
+         * client is actually agreeing to pay, and it keeps the document honest
+         * when the quote is later revised.
+         */
+        const quoted = (shoot?.lineItems ?? []).reduce((sum, li) => sum + li.qty * li.rate, 0)
+        const pct = shoot?.depositPct ?? billing.depositPct
+        const paidAlready = invoices
+          .filter((inv) => inv.shootId === shootId && inv.status !== 'void')
+          .reduce(
+            (sum, inv) => sum + inv.lineItems.reduce((n, li) => n + li.qty * li.rate, 0),
+            0,
+          )
+
+        const lineItems: LineItem[] =
+          kind === 'deposit'
+            ? [
+                {
+                  id: uid('li'),
+                  kind: 'shoot-fee',
+                  desc: `Deposit — ${pct}% of agreed fee`,
+                  qty: 1,
+                  rate: Math.round(quoted * (pct / 100) * 100) / 100,
+                },
+              ]
+            : kind === 'balance'
+              ? [
+                  {
+                    id: uid('li'),
+                    kind: 'shoot-fee',
+                    desc: 'Balance due on delivery',
+                    qty: 1,
+                    rate: Math.round((quoted - paidAlready) * 100) / 100,
+                  },
+                ]
+              : // A full invoice bills the quote itself, line for line.
+                (shoot?.lineItems ?? []).map((li) => ({ ...li, id: uid('li') }))
+
+        const issued = today()
+        const due = new Date(issued)
+        due.setDate(due.getDate() + billing.paymentTermsDays)
+
+        const invoice: Invoice = {
+          id,
+          shootId,
+          number: nextInvoiceNumber(invoices, issued),
+          kind,
+          lineItems,
+          status: 'draft',
+          issuedAt: issued,
+          dueAt: toISODate(due),
+          notes: billing.defaultNotes,
+          signoff: billing.defaultSignoff,
+          paper: 'light',
+          createdAt: issued,
+        }
+        set((s) => ({ invoices: [invoice, ...s.invoices] }))
+        get().logActivity({
+          type: 'invoice',
+          subject: `Invoice ${invoice.number} raised${shoot ? ` — ${shoot.name}` : ''}`,
+          actorId: settings.currentUserId,
+          actorKind: 'team',
+          links: { invoiceId: id, shootId, companyId: shoot?.companyId },
+        })
+        return id
+      },
+      updateInvoice: (id, patch) => set((s) => ({ invoices: patchIn(s.invoices, id, patch) })),
+      deleteInvoice: (id) => set((s) => ({ invoices: s.invoices.filter((i) => i.id !== id) })),
+
+      markInvoicePaid: (id, paidAt) => {
+        const invoice = get().invoices.find((i) => i.id === id)
+        if (!invoice) return
         set((s) => ({
-          deals: patchIn(s.deals, id, {
-            stageId,
-            probability: stage.probability,
-            closedAt: stage.kind === 'open' ? undefined : today(),
-          }),
+          invoices: patchIn(s.invoices, id, { status: 'paid', paidAt: paidAt ?? today() }),
         }))
         get().logActivity({
-          type: 'deal',
-          subject: `${deal.name} moved to ${stage.name}`,
+          type: 'invoice',
+          subject: `Invoice ${invoice.number} paid`,
           actorId: get().settings.currentUserId,
           actorKind: 'team',
-          links: { dealId: id, companyId: deal.companyId, contactId: deal.contactId },
+          links: { invoiceId: id, shootId: invoice.shootId },
         })
       },
+
+      /* ----------------------------------------------------- lead sources */
+
+      addLeadSource: (label, category) => {
+        const id = uid('ls')
+        set((s) => ({
+          leadSources: [...s.leadSources, { id, label, category: category ?? 'other', active: true }],
+        }))
+        return id
+      },
+      updateLeadSource: (id, patch) =>
+        set((s) => ({ leadSources: patchIn(s.leadSources, id, patch) })),
+      deleteLeadSource: (id) =>
+        set((s) => ({
+          leadSources: s.leadSources.filter((l) => l.id !== id),
+          // Never leave a shoot pointing at a source that no longer exists.
+          shoots: s.shoots.map((shoot) =>
+            shoot.leadSourceId === id ? { ...shoot, leadSourceId: undefined } : shoot,
+          ),
+        })),
 
       /* ------------------------------------------------------------ tasks */
 
@@ -353,8 +555,7 @@ export const useStore = create<Store>()(
           priority: draft.priority ?? 'normal',
           dueDate: draft.dueDate,
           assigneeId: draft.assigneeId ?? get().settings.currentUserId,
-          projectId: draft.projectId,
-          dealId: draft.dealId,
+          shootId: draft.shootId,
           contactId: draft.contactId,
           reminderAt: draft.reminderAt,
           createdAt: today(),
@@ -382,15 +583,15 @@ export const useStore = create<Store>()(
 
       /* ------------------------------------------------------- moodboards */
 
-      ensureMoodboard: (projectId) => {
-        const existing = get().moodboards.find((b) => b.projectId === projectId)
+      ensureMoodboard: (shootId) => {
+        const existing = get().moodboards.find((b) => b.shootId === shootId)
         if (existing) return existing.id
         const boardId = uid('mb')
-        const project = get().projects.find((p) => p.id === projectId)
+        const shoot = get().shoots.find((p) => p.id === shootId)
         set((s) => ({
           moodboards: [
             ...s.moodboards,
-            { id: boardId, projectId, title: project?.name ?? 'Moodboard', updatedAt: nowISO() },
+            { id: boardId, shootId, title: shoot?.name ?? 'Moodboard', updatedAt: nowISO() },
           ],
           moodSections: [
             ...s.moodSections,
@@ -487,7 +688,7 @@ export const useStore = create<Store>()(
           assets: [
             {
               id: assetId,
-              projectId: draft.projectId,
+              shootId: draft.shootId,
               name: draft.name,
               kind: draft.kind,
               currentVersionId: versionId,
@@ -562,7 +763,7 @@ export const useStore = create<Store>()(
           body: decision,
           actorId: get().settings.currentUserId,
           actorKind: 'team',
-          links: { projectId: asset?.projectId, assetVersionId: versionId },
+          links: { shootId: asset?.shootId, assetVersionId: versionId },
         })
       },
 
@@ -624,45 +825,44 @@ export const useStore = create<Store>()(
       deleteTag: (id) =>
         set((s) => ({
           tags: s.tags.filter((t) => t.id !== id),
-          projects: s.projects.map((p) => ({ ...p, tags: p.tags.filter((t) => t !== id) })),
+          shoots: s.shoots.map((p) => ({ ...p, tags: p.tags.filter((t) => t !== id) })),
           contacts: s.contacts.map((c) => ({ ...c, tags: c.tags.filter((t) => t !== id) })),
           companies: s.companies.map((c) => ({ ...c, tags: c.tags.filter((t) => t !== id) })),
-          deals: s.deals.map((d) => ({ ...d, tags: d.tags.filter((t) => t !== id) })),
         })),
 
       updatePipelineStage: (id, patch) =>
         set((s) => ({ pipeline: patchIn(s.pipeline, id, patch) })),
       addPipelineStage: (name) => {
         const id = uid('ps')
-        const openStages = get().pipeline.filter((p) => p.kind === 'open')
-        const order = openStages.length
+        const liveStages = get().pipeline.filter((p) => !isClosed(p.kind))
+        const order = liveStages.length
         set((s) => ({
           pipeline: [
-            ...s.pipeline.filter((p) => p.kind === 'open'),
-            { id, name, order, probability: 50, kind: 'open' as const },
-            ...s.pipeline.filter((p) => p.kind !== 'open').map((p) => ({ ...p, order: p.order + 1 })),
+            ...liveStages,
+            { id, name, order, probability: 50, kind: 'production' as const },
+            ...s.pipeline.filter((p) => isClosed(p.kind)).map((p) => ({ ...p, order: p.order + 1 })),
           ],
         }))
         return id
       },
       deletePipelineStage: (id) => {
-        const remaining = get().pipeline.filter((p) => p.id !== id && p.kind === 'open')
+        const remaining = get().pipeline.filter((p) => p.id !== id && !isClosed(p.kind))
         const fallback = remaining[0]?.id
         if (!fallback) return
         set((s) => ({
           pipeline: s.pipeline.filter((p) => p.id !== id),
-          deals: s.deals.map((d) => (d.stageId === id ? { ...d, stageId: fallback } : d)),
+          shoots: s.shoots.map((d) => (d.stageId === id ? { ...d, stageId: fallback } : d)),
         }))
       },
       reorderPipeline: (activeId, overId) =>
         set((s) => {
-          const open = s.pipeline.filter((p) => p.kind === 'open').sort((a, b) => a.order - b.order)
-          const from = open.findIndex((p) => p.id === activeId)
-          const to = open.findIndex((p) => p.id === overId)
+          const live = s.pipeline.filter((p) => !isClosed(p.kind)).sort((a, b) => a.order - b.order)
+          const from = live.findIndex((p) => p.id === activeId)
+          const to = live.findIndex((p) => p.id === overId)
           if (from === -1 || to === -1) return {}
-          const reordered = arrayMove(open, from, to).map((p, index) => ({ ...p, order: index }))
+          const reordered = arrayMove(live, from, to).map((p, index) => ({ ...p, order: index }))
           const closed = s.pipeline
-            .filter((p) => p.kind !== 'open')
+            .filter((p) => isClosed(p.kind))
             .map((p, index) => ({ ...p, order: reordered.length + index }))
           return { pipeline: [...reordered, ...closed] }
         }),
@@ -742,7 +942,7 @@ export const useStore = create<Store>()(
        * Apply the structural answers from setup: the pipeline the studio
        * actually sells through, and the services it sells. Starting empty means
        * these replace the defaults outright; starting from the demo keeps the
-       * seeded stages, because the demo deals are already sitting in them.
+       * seeded stages, because the demo shoots are already sitting in them.
        */
       applySetup: (result) =>
         set((s) => {
@@ -776,10 +976,12 @@ export const useStore = create<Store>()(
             team: me ? [me] : [],
             companies: [],
             contacts: [],
-            projects: [],
+            leadSources: [],
+            shoots: [],
             milestones: [],
             tasks: [],
-            deals: [],
+            licenses: [],
+            invoices: [],
             moodboards: [],
             moodSections: [],
             moodItems: [],
@@ -803,7 +1005,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: STORAGE_KEY,
-      version: 3,
+      version: 4,
       // Actions are recreated on every load; only the data is persisted.
       partialize: (state) =>
         Object.fromEntries(
@@ -834,37 +1036,53 @@ export const useStore = create<Store>()(
             workspace: {
               ...current.settings.workspace,
               ...(savedSettings?.workspace ?? {}),
+              billing: {
+                ...current.settings.workspace.billing,
+                ...(savedSettings?.workspace?.billing ?? {}),
+              },
             },
           },
         }
       },
 
       /*
+       * Migrations run in sequence from whatever version was saved, because a
+       * workspace that has been sitting on v2 must arrive at v4 by the same
+       * route as everyone else.
+       *
        * v3 removes the third-party avatar service. Anyone still holding one of
        * its URLs gets a locally drawn portrait instead — except the signed-in
        * user, who is cleared to initials, because inheriting a demo character's
        * face as your own was never right and a real upload should replace it.
+       *
+       * v4 folds deals and projects into shoots. See store/migrations.ts.
        */
-      migrate: (persisted) => {
-        const state = persisted as Database | undefined
+      migrate: (persisted, version) => {
+        let state = persisted as Database | undefined
         if (!state?.team) return state as Database
 
-        const isService = (url?: string) => Boolean(url && url.includes('pravatar.cc'))
-        const meId = state.settings?.currentUserId
+        if (version < 3) {
+          const isService = (url?: string) => Boolean(url && url.includes('pravatar.cc'))
+          const meId = state.settings?.currentUserId
 
-        return {
-          ...state,
-          team: state.team.map((member) =>
-            isService(member.avatar)
-              ? { ...member, avatar: member.id === meId ? undefined : generatePortrait(member.id) }
-              : member,
-          ),
-          contacts: (state.contacts ?? []).map((contact) =>
-            isService(contact.avatar)
-              ? { ...contact, avatar: generatePortrait(contact.id) }
-              : contact,
-          ),
+          state = {
+            ...state,
+            team: state.team.map((member) =>
+              isService(member.avatar)
+                ? { ...member, avatar: member.id === meId ? undefined : generatePortrait(member.id) }
+                : member,
+            ),
+            contacts: (state.contacts ?? []).map((contact) =>
+              isService(contact.avatar)
+                ? { ...contact, avatar: generatePortrait(contact.id) }
+                : contact,
+            ),
+          }
         }
+
+        if (version < 4) state = migrateToV4(state)
+
+        return state as Database
       },
     },
   ),

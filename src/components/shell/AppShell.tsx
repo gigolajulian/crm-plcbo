@@ -244,7 +244,7 @@ function TopBar({ onSearch, onQuickAdd }: { onSearch: () => void; onQuickAdd: ()
         >
           <Search size={16} className="shrink-0 text-ink-faint" aria-hidden />
           <span className="flex-1 truncate text-base text-ink-faint">
-            Search projects, clients, deals…
+            Search shoots, clients, invoices…
           </span>
           <span className="hidden shrink-0 sm:block">
             <Kbd>{modKey()}K</Kbd>

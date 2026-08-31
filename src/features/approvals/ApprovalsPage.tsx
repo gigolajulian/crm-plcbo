@@ -15,7 +15,7 @@ import { ReviewRoom } from './ReviewRoom'
 /* ============================================================================
    APPROVALS
    The cross-project review queue. Picking anything here drops into the same
-   review room used inside a project, so the interaction is learned once.
+   review room used inside a shoot, so the interaction is learned once.
    ========================================================================== */
 
 const FILTERS: Array<{ id: ApprovalStatus; label: string }> = [
@@ -134,7 +134,7 @@ export default function ApprovalsPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="truncate text-base font-medium">{item.assetName}</p>
-                              <p className="truncate text-sm text-ink-muted">{item.projectName}</p>
+                              <p className="truncate text-sm text-ink-muted">{item.shootName}</p>
                             </div>
                             <Pill tone="neutral" size="sm">
                               {item.label}

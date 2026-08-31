@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Briefcase,
+  Camera,
   CheckSquare,
-  Handshake,
   MessageSquare,
   User,
   type LucideIcon,
@@ -15,7 +14,8 @@ import { Button } from '@/components/ui/primitives'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import { Sheet } from '@/components/ui/overlay'
 import { toast } from '@/components/ui/feedback'
-import type { ActivityType, TaskPriority } from '@/data/types'
+import type { ActivityType, ShootType, TaskPriority } from '@/data/types'
+import { SHOOT_TYPES } from '@/data/types'
 import type { QuickAddMode } from '@/store/useUI'
 
 /* ============================================================================
@@ -30,9 +30,8 @@ type Mode = QuickAddMode
 const MODES: Array<{ id: Mode; label: string; icon: LucideIcon }> = [
   { id: 'task', label: 'Task', icon: CheckSquare },
   { id: 'log', label: 'Log', icon: MessageSquare },
-  { id: 'project', label: 'Project', icon: Briefcase },
+  { id: 'shoot', label: 'Shoot', icon: Camera },
   { id: 'contact', label: 'Client', icon: User },
-  { id: 'deal', label: 'Deal', icon: Handshake },
 ]
 
 export function QuickAdd({ mode: initialMode, onClose }: { mode: Mode | null; onClose: () => void }) {
@@ -76,9 +75,8 @@ export function QuickAdd({ mode: initialMode, onClose }: { mode: Mode | null; on
 
       {mode === 'task' && <TaskForm onDone={onClose} />}
       {mode === 'log' && <LogForm onDone={onClose} />}
-      {mode === 'project' && <ProjectForm onDone={onClose} />}
+      {mode === 'shoot' && <ShootForm onDone={onClose} />}
       {mode === 'contact' && <ContactForm onDone={onClose} />}
-      {mode === 'deal' && <DealForm onDone={onClose} />}
     </Sheet>
   )
 }
@@ -87,12 +85,12 @@ export function QuickAdd({ mode: initialMode, onClose }: { mode: Mode | null; on
 
 function TaskForm({ onDone }: { onDone: () => void }) {
   const addTask = useStore((s) => s.addTask)
-  const projects = useStore((s) => s.projects)
+  const shoots = useStore((s) => s.shoots)
   const team = useActiveTeam()
   const currentUserId = useStore((s) => s.settings.currentUserId)
 
   const [title, setTitle] = useState('')
-  const [projectId, setProjectId] = useState('')
+  const [shootId, setProjectId] = useState('')
   const [assigneeId, setAssigneeId] = useState(currentUserId)
   const [priority, setPriority] = useState<TaskPriority>('normal')
   const [due, setDue] = useState(toISODate(addDays(startOfToday(), 1)))
@@ -102,7 +100,7 @@ function TaskForm({ onDone }: { onDone: () => void }) {
     if (!title.trim()) return
     addTask({
       title: title.trim(),
-      projectId: projectId || undefined,
+      shootId: shootId || undefined,
       assigneeId,
       priority,
       dueDate: due || undefined,
@@ -125,10 +123,10 @@ function TaskForm({ onDone }: { onDone: () => void }) {
         <Select
           label="Project"
           placeholder="No project"
-          value={projectId}
+          value={shootId}
           onChange={(e) => setProjectId(e.target.value)}
-          options={projects
-            .filter((p) => p.stage !== 'complete')
+          options={shoots
+            .filter((p) => !p.archived)
             .map((p) => ({ value: p.id, label: p.name }))}
         />
         <Select
@@ -168,14 +166,14 @@ function TaskForm({ onDone }: { onDone: () => void }) {
 function LogForm({ onDone }: { onDone: () => void }) {
   const logActivity = useStore((s) => s.logActivity)
   const contacts = useStore((s) => s.contacts)
-  const projects = useStore((s) => s.projects)
+  const shoots = useStore((s) => s.shoots)
   const currentUserId = useStore((s) => s.settings.currentUserId)
 
   const [type, setType] = useState<ActivityType>('call')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [contactId, setContactId] = useState('')
-  const [projectId, setProjectId] = useState('')
+  const [shootId, setProjectId] = useState('')
   const [followUp, setFollowUp] = useState('')
 
   function submit(event: React.FormEvent) {
@@ -191,7 +189,7 @@ function LogForm({ onDone }: { onDone: () => void }) {
       direction: type === 'email' || type === 'call' ? 'outbound' : undefined,
       links: {
         contactId: contactId || undefined,
-        projectId: projectId || undefined,
+        shootId: shootId || undefined,
         companyId: contact?.companyId,
       },
       followUpAt: followUp || undefined,
@@ -240,9 +238,9 @@ function LogForm({ onDone }: { onDone: () => void }) {
         <Select
           label="Project"
           placeholder="No project"
-          value={projectId}
+          value={shootId}
           onChange={(e) => setProjectId(e.target.value)}
-          options={projects.map((p) => ({ value: p.id, label: p.name }))}
+          options={shoots.map((p) => ({ value: p.id, label: p.name }))}
         />
       </div>
       <Field label="Follow up on" hint="Leave empty if nothing is owed." htmlFor="qa-follow">
@@ -259,21 +257,31 @@ function LogForm({ onDone }: { onDone: () => void }) {
   )
 }
 
-/* --------------------------------------------------------------- project -- */
+/* ----------------------------------------------------------------- shoot -- */
 
-function ProjectForm({ onDone }: { onDone: () => void }) {
-  const addProject = useStore((s) => s.addProject)
+/**
+ * One form for the whole job. There is no separate "new deal" — an enquiry and
+ * the shoot it becomes are the same record, so this is where both start.
+ */
+function ShootForm({ onDone }: { onDone: () => void }) {
+  const addShoot = useStore((s) => s.addShoot)
   const companies = useStore((s) => s.companies)
   const contacts = useStore((s) => s.contacts)
+  const leadSources = useStore((s) => s.leadSources)
+  const pipeline = useOpenStages()
   const team = useActiveTeam()
+  const currentUserId = useStore((s) => s.settings.currentUserId)
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? '')
   const [contactId, setContactId] = useState('')
-  const [leadId, setLeadId] = useState(team[0]?.id ?? '')
-  const [budget, setBudget] = useState('')
-  const [due, setDue] = useState(toISODate(addDays(startOfToday(), 45)))
+  const [ownerId, setOwnerId] = useState(currentUserId)
+  const [shootType, setShootType] = useState<ShootType>('commercial')
+  const [stageId, setStageId] = useState(pipeline[0]?.id ?? '')
+  const [leadSourceId, setLeadSourceId] = useState('')
+  const [fee, setFee] = useState('')
+  const [close, setClose] = useState(toISODate(addDays(startOfToday(), 30)))
 
   const companyContacts = contacts.filter((c) => c.companyId === companyId)
 
@@ -285,77 +293,114 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
   function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!name.trim() || !companyId || !contactId) return
-    const id = addProject({
+    const amount = Number(fee) || 0
+    const id = addShoot({
       name: name.trim(),
       companyId,
-      clientContactId: contactId,
-      leadId,
-      budget: Number(budget) || 0,
-      dueDate: due,
+      contactId,
+      ownerId,
+      shootType,
+      stageId,
+      leadSourceId: leadSourceId || undefined,
+      expectedCloseDate: close,
       code: name.trim().slice(0, 2).toUpperCase() + '-' + String(Date.now()).slice(-2),
+      // A single starting line, broken out properly when the quote is built.
+      lineItems: amount
+        ? [{ id: `li_${Date.now()}`, kind: 'shoot-fee', desc: 'Shoot fee', qty: 1, rate: amount }]
+        : [],
     })
-    toast.success('Project created', {
+    toast.success('Shoot created', {
       detail: 'A moodboard was created alongside it.',
-      action: { label: 'Open', onClick: () => navigate(`/projects/${id}`) },
+      action: { label: 'Open', onClick: () => navigate(`/shoots/${id}`) },
     })
     onDone()
-    navigate(`/projects/${id}`)
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
-        label="Project name"
-        placeholder="Spring campaign"
+        label="Name"
+        required
         value={name}
         onChange={(e) => setName(e.target.value)}
-        required
+        placeholder="Autumn campaign"
         autoFocus
       />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
-          label="Company"
+          label="Client"
+          required
           value={companyId}
           onChange={(e) => setCompanyId(e.target.value)}
-          options={companies.map((c) => ({ value: c.id, label: c.name }))}
-          required
+          options={companies.map((company) => ({ value: company.id, label: company.name }))}
         />
         <Select
-          label="Client contact"
+          label="Contact"
+          required
+          placeholder={companyContacts.length === 0 ? 'No one at this client yet' : undefined}
           value={contactId}
           onChange={(e) => setContactId(e.target.value)}
-          options={companyContacts.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder={companyContacts.length ? undefined : 'No contacts at this company'}
-          required
-        />
-        <Select
-          label="Project lead"
-          value={leadId}
-          onChange={(e) => setLeadId(e.target.value)}
-          options={team.map((m) => ({ value: m.id, label: m.name }))}
-        />
-        <Input
-          label="Budget"
-          type="number"
-          min={0}
-          step={1000}
-          placeholder="0"
-          value={budget}
-          onChange={(e) => setBudget(e.target.value)}
+          options={companyContacts.map((contact) => ({ value: contact.id, label: contact.name }))}
         />
       </div>
-      <Field label="Due date" htmlFor="qa-pdue">
-        <input
-          id="qa-pdue"
-          type="date"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-          className="h-11 w-full rounded-lg bg-raised px-3.5 text-base shadow-xs"
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select
+          label="Type"
+          value={shootType}
+          onChange={(e) => setShootType(e.target.value as ShootType)}
+          options={SHOOT_TYPES.map((type) => ({ value: type.id, label: type.label }))}
         />
-      </Field>
+        <Select
+          label="Stage"
+          value={stageId}
+          onChange={(e) => setStageId(e.target.value)}
+          options={pipeline.map((stage) => ({ value: stage.id, label: stage.name }))}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select
+          label="How did they find you?"
+          hint="Drives the lead source report"
+          placeholder="Not recorded"
+          value={leadSourceId}
+          onChange={(e) => setLeadSourceId(e.target.value)}
+          options={leadSources
+            .filter((source) => source.active)
+            .map((source) => ({ value: source.id, label: source.label }))}
+        />
+        <Select
+          label="Owner"
+          value={ownerId}
+          onChange={(e) => setOwnerId(e.target.value)}
+          options={team.map((member) => ({ value: member.id, label: member.name }))}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input
+          label="Opening fee"
+          hint="Break it into line items later"
+          type="number"
+          min="0"
+          step="100"
+          value={fee}
+          onChange={(e) => setFee(e.target.value)}
+          placeholder="0"
+        />
+        <Input
+          label="Expected close"
+          type="date"
+          value={close}
+          onChange={(e) => setClose(e.target.value)}
+        />
+      </div>
+
       <FormActions
         onCancel={onDone}
-        label="Create project"
+        label="Create shoot"
         disabled={!name.trim() || !contactId}
       />
     </form>
@@ -429,110 +474,6 @@ function ContactForm({ onDone }: { onDone: () => void }) {
         />
       )}
       <FormActions onCancel={onDone} label="Add client" disabled={!name.trim()} />
-    </form>
-  )
-}
-
-/* ------------------------------------------------------------------ deal -- */
-
-function DealForm({ onDone }: { onDone: () => void }) {
-  const addDeal = useStore((s) => s.addDeal)
-  const companies = useStore((s) => s.companies)
-  const contacts = useStore((s) => s.contacts)
-  const pipeline = useOpenStages()
-  const team = useActiveTeam()
-  const currentUserId = useStore((s) => s.settings.currentUserId)
-  const navigate = useNavigate()
-
-  const [name, setName] = useState('')
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? '')
-  const [contactId, setContactId] = useState('')
-  const [value, setValue] = useState('')
-  const [stageId, setStageId] = useState(pipeline[0]?.id ?? '')
-  const [ownerId, setOwnerId] = useState(currentUserId)
-  const [close, setClose] = useState(toISODate(addDays(startOfToday(), 30)))
-
-  const companyContacts = contacts.filter((c) => c.companyId === companyId)
-
-  useEffect(() => {
-    setContactId(companyContacts[0]?.id ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId])
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault()
-    if (!name.trim() || !contactId) return
-    const id = addDeal({
-      name: name.trim(),
-      companyId,
-      contactId,
-      stageId,
-      ownerId,
-      value: Number(value) || 0,
-      expectedCloseDate: close,
-    })
-    toast.success('Deal added to the pipeline', {
-      action: { label: 'Open', onClick: () => navigate(`/deals/${id}`) },
-    })
-    onDone()
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <Input
-        label="Deal name"
-        placeholder="Rebrand — phase one"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-        autoFocus
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Select
-          label="Company"
-          value={companyId}
-          onChange={(e) => setCompanyId(e.target.value)}
-          options={companies.map((c) => ({ value: c.id, label: c.name }))}
-        />
-        <Select
-          label="Contact"
-          value={contactId}
-          onChange={(e) => setContactId(e.target.value)}
-          options={companyContacts.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder={companyContacts.length ? undefined : 'No contacts at this company'}
-        />
-        <Input
-          label="Value"
-          type="number"
-          min={0}
-          step={1000}
-          placeholder="0"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <Select
-          label="Stage"
-          value={stageId}
-          onChange={(e) => setStageId(e.target.value)}
-          options={pipeline.map((p) => ({ value: p.id, label: p.name }))}
-        />
-        <Select
-          label="Owner"
-          value={ownerId}
-          onChange={(e) => setOwnerId(e.target.value)}
-          options={team.map((m) => ({ value: m.id, label: m.name }))}
-        />
-        <Field label="Expected close" htmlFor="qa-close">
-          <input
-            id="qa-close"
-            type="date"
-            value={close}
-            onChange={(e) => setClose(e.target.value)}
-            className="h-11 w-full rounded-lg bg-raised px-3.5 text-base shadow-xs"
-          />
-        </Field>
-      </div>
-      <FormActions onCancel={onDone} label="Add deal" disabled={!name.trim() || !contactId} />
     </form>
   )
 }

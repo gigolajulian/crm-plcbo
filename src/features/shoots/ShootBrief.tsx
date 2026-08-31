@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Check, Pencil, Target } from 'lucide-react'
-import type { Project } from '@/data/types'
+import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, sum } from '@/lib/utils'
+import { lineItemsTotal } from '@/store/selectors'
 import { Button, Card, Pill } from '@/components/ui/primitives'
 import { Textarea } from '@/components/ui/form'
 import { SectionHeading, TaskCheck } from '@/components/common/records'
@@ -34,8 +35,8 @@ const FIELDS = [
   },
 ]
 
-export function ProjectBrief({ project }: { project: Project }) {
-  const updateProject = useStore((s) => s.updateProject)
+export function ShootBrief({ shoot }: { shoot: Shoot }) {
+  const updateShoot = useStore((s) => s.updateShoot)
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
 
@@ -44,8 +45,8 @@ export function ProjectBrief({ project }: { project: Project }) {
     setDraft(value)
   }
 
-  function commit(key: keyof Project['brief']) {
-    updateProject(project.id, { brief: { ...project.brief, [key]: draft } })
+  function commit(key: keyof Shoot['brief']) {
+    updateShoot(shoot.id, { brief: { ...shoot.brief, [key]: draft } })
     setEditing(null)
     toast.success('Brief updated')
   }
@@ -55,7 +56,7 @@ export function ProjectBrief({ project }: { project: Project }) {
       <Card variant="raised" padding="lg" radius="3xl">
         <article className="flex flex-col gap-8">
           {FIELDS.map((field) => {
-            const value = project.brief[field.key]
+            const value = shoot.brief[field.key]
             const isEditing = editing === field.key
             return (
               <section key={field.key}>
@@ -114,11 +115,11 @@ export function ProjectBrief({ project }: { project: Project }) {
               <Target size={16} aria-hidden />
               What good looks like
             </h3>
-            {project.brief.successCriteria.length === 0 ? (
+            {shoot.brief.successCriteria.length === 0 ? (
               <p className="text-sm text-ink-faint">No success criteria set.</p>
             ) : (
               <ul className="flex flex-col gap-2">
-                {project.brief.successCriteria.map((criterion, index) => (
+                {shoot.brief.successCriteria.map((criterion, index) => (
                   <li key={index} className="flex items-start gap-2.5">
                     <span
                       className="mt-1 grid size-4 shrink-0 place-items-center rounded-full bg-lime text-[#0a0a0a]"
@@ -137,8 +138,8 @@ export function ProjectBrief({ project }: { project: Project }) {
 
       {/* ----------------------------------------------------- side rail */}
       <div className="flex flex-col gap-5">
-        <Deliverables project={project} />
-        <ClientContext project={project} />
+        <Deliverables shoot={shoot} />
+        <ClientContext shoot={shoot} />
       </div>
     </div>
   )
@@ -146,14 +147,18 @@ export function ProjectBrief({ project }: { project: Project }) {
 
 /* --------------------------------------------------------- deliverables -- */
 
-function Deliverables({ project }: { project: Project }) {
-  const updateProject = useStore((s) => s.updateProject)
-  const done = project.deliverables.filter((d) => d.done).length
+function Deliverables({ shoot }: { shoot: Shoot }) {
+  const updateShoot = useStore((s) => s.updateShoot)
+  const contracted = sum(shoot.deliverables.map((d) => d.contracted))
+  const delivered = sum(shoot.deliverables.map((d) => d.delivered))
 
+  /** Marking a line complete means every contracted file has gone out. */
   function toggle(id: string) {
-    updateProject(project.id, {
-      deliverables: project.deliverables.map((d) =>
-        d.id === id ? { ...d, done: !d.done } : d,
+    updateShoot(shoot.id, {
+      deliverables: shoot.deliverables.map((d) =>
+        d.id === id
+          ? { ...d, delivered: d.delivered >= d.contracted ? 0 : d.contracted }
+          : d,
       ),
     })
   }
@@ -162,28 +167,42 @@ function Deliverables({ project }: { project: Project }) {
     <Card variant="surface" padding="md" radius="2xl">
       <SectionHeading
         title="Deliverables"
-        count={project.deliverables.length}
-        description={`${done} of ${project.deliverables.length} complete`}
+        count={shoot.deliverables.length}
+        description={`${delivered} of ${contracted} files delivered`}
       />
-      {project.deliverables.length === 0 ? (
+      {shoot.deliverables.length === 0 ? (
         <p className="py-3 text-sm text-ink-muted">Nothing listed yet.</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
-          {project.deliverables.map((deliverable) => (
-            <li key={deliverable.id} className="flex items-start gap-2.5 py-2">
-              <TaskCheck
-                done={deliverable.done}
-                label={deliverable.name}
-                onToggle={() => toggle(deliverable.id)}
-              />
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-base leading-snug', deliverable.done && 'text-ink-muted line-through')}>
-                  {deliverable.name}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-faint">{deliverable.quantity}</p>
-              </div>
-            </li>
-          ))}
+          {shoot.deliverables.map((deliverable) => {
+            const complete = deliverable.delivered >= deliverable.contracted
+            const spent = deliverable.revisionsUsed >= deliverable.revisionsIncluded
+            return (
+              <li key={deliverable.id} className="flex items-start gap-2.5 py-2">
+                <TaskCheck
+                  done={complete}
+                  label={deliverable.name}
+                  onToggle={() => toggle(deliverable.id)}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className={cn('text-base leading-snug', complete && 'text-ink-muted line-through')}>
+                    {deliverable.name}
+                  </p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
+                    <span className="tabular">
+                      {deliverable.delivered} / {deliverable.contracted} delivered
+                    </span>
+                    {deliverable.revisionsIncluded > 0 && (
+                      <span className={cn('tabular', spent && 'text-critical')}>
+                        · {deliverable.revisionsUsed} / {deliverable.revisionsIncluded} revisions
+                        {spent ? ' — further rounds are chargeable' : ''}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </Card>
@@ -192,9 +211,9 @@ function Deliverables({ project }: { project: Project }) {
 
 /* ------------------------------------------------------- client context -- */
 
-function ClientContext({ project }: { project: Project }) {
-  const contact = useStore((s) => s.contacts.find((c) => c.id === project.clientContactId))
-  const company = useStore((s) => s.companies.find((c) => c.id === project.companyId))
+function ClientContext({ shoot }: { shoot: Shoot }) {
+  const contact = useStore((s) => s.contacts.find((c) => c.id === shoot.contactId))
+  const company = useStore((s) => s.companies.find((c) => c.id === shoot.companyId))
 
   return (
     <Card variant="raised" padding="md" radius="2xl">
@@ -225,15 +244,15 @@ function ClientContext({ project }: { project: Project }) {
             <dd className="truncate text-right">{company.industry}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-ink-muted">Fee</dt>
-            <dd className="tabular text-right">{formatCurrency(project.budget)}</dd>
+            <dt className="text-ink-muted">Quoted</dt>
+            <dd className="tabular text-right">{formatCurrency(lineItemsTotal(shoot.lineItems))}</dd>
           </div>
         </dl>
       )}
 
-      {project.dealId && (
+      {shoot.referredByContactId && (
         <div className="mt-4">
-          <Pill tone="lime">Came from a won deal</Pill>
+          <Pill tone="lime">Referred by a client</Pill>
         </div>
       )}
     </Card>

@@ -45,7 +45,7 @@ import { AddReferenceSheet } from './AddReferenceSheet'
 
 const KIND_FILTERS: MoodItemKind[] = ['image', 'shot', 'material', 'color', 'type', 'link', 'note']
 
-export function MoodboardCanvas({ projectId }: { projectId: ID }) {
+export function MoodboardCanvas({ shootId }: { shootId: ID }) {
   const ensureMoodboard = useStore((s) => s.ensureMoodboard)
   const boards = useStore((s) => s.moodboards)
   const allSections = useStore((s) => s.moodSections)
@@ -61,7 +61,7 @@ export function MoodboardCanvas({ projectId }: { projectId: ID }) {
   const updateMoodSection = useStore((s) => s.updateMoodSection)
   const deleteMoodSection = useStore((s) => s.deleteMoodSection)
 
-  const board = boards.find((b) => b.projectId === projectId)
+  const board = boards.find((b) => b.shootId === shootId)
   const boardId = board?.id
 
   const [query, setQuery] = useState('')
@@ -121,7 +121,7 @@ export function MoodboardCanvas({ projectId }: { projectId: ID }) {
           <Button
             variant="primary"
             onClick={() => {
-              ensureMoodboard(projectId)
+              ensureMoodboard(shootId)
               toast.success('Moodboard created')
             }}
           >

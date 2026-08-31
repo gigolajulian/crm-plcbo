@@ -28,9 +28,8 @@ export default function ContactsPage() {
 
   const contacts = useStore((s) => s.contacts)
   const companies = useStore((s) => s.companies)
-  const projects = useStore((s) => s.projects)
-  const deals = useStore((s) => s.deals)
-  const tags = useStore((s) => s.tags)
+  const shoots = useStore((s) => s.shoots)
+    const tags = useStore((s) => s.tags)
   const updateContact = useStore((s) => s.updateContact)
 
   const { filters, query, setQuery, toggle, clear, activeCount } = useFilterState()
@@ -150,10 +149,10 @@ export default function ContactsPage() {
           <ul className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filteredContacts.map((contact, index) => {
               const company = companies.find((c) => c.id === contact.companyId)
-              const contactProjects = projects.filter(
-                (p) => p.clientContactId === contact.id && p.stage !== 'complete',
+              // One record now, so a contact's live work is one count.
+              const contactShoots = shoots.filter(
+                (p) => p.contactId === contact.id && !p.archived,
               )
-              const contactDeals = deals.filter((d) => d.contactId === contact.id)
               const stale = daysFromToday(contact.lastTouchedAt) < -21
 
               return (
@@ -207,9 +206,9 @@ export default function ContactsPage() {
                     <TagList ids={contact.tags} max={3} />
 
                     <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line-soft pt-3 text-xs text-ink-muted">
-                      <span>{pluralize(contactProjects.length, 'live project')}</span>
+                      <span>{pluralize(contactShoots.length, 'live shoot')}</span>
                       <span aria-hidden>·</span>
-                      <span>{pluralize(contactDeals.length, 'deal')}</span>
+                      <span>{pluralize(contactShoots.length, 'deal')}</span>
                       <span
                         className={cn('ml-auto', stale && 'font-medium text-caution')}
                       >
@@ -228,8 +227,8 @@ export default function ContactsPage() {
         <ul className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filteredCompanies.map((company, index) => {
             const people = contacts.filter((c) => c.companyId === company.id)
-            const live = projects.filter(
-              (p) => p.companyId === company.id && p.stage !== 'complete',
+            const live = shoots.filter(
+              (p) => p.companyId === company.id && !p.archived,
             )
             return (
               <li key={company.id} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
@@ -261,7 +260,7 @@ export default function ContactsPage() {
                   <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-3 text-xs text-ink-muted">
                     <span>{pluralize(people.length, 'contact')}</span>
                     <span aria-hidden>·</span>
-                    <span>{pluralize(live.length, 'live project')}</span>
+                    <span>{pluralize(live.length, 'live shoot')}</span>
                     {live.length > 0 && (
                       <Pill tone="lime" size="sm" className="ml-auto">
                         Active
