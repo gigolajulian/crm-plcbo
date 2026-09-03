@@ -350,6 +350,7 @@ export const useStore = create<Store>()(
           tags: draft.tags ?? [],
           location: draft.location,
           creativePrefs: draft.creativePrefs ?? '',
+          instagram: draft.instagram,
           notes: draft.notes ?? '',
           lastTouchedAt: today(),
           favourite: draft.favourite ?? false,
@@ -382,6 +383,7 @@ export const useStore = create<Store>()(
           size: draft.size ?? '',
           tags: draft.tags ?? [],
           notes: draft.notes ?? '',
+          instagram: draft.instagram,
           artSeed: draft.artSeed ?? `${draft.name}-${id}`,
           since: today(),
         }

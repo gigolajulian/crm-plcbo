@@ -13,6 +13,7 @@ import { useActiveTeam, useOpenStages } from '@/store/selectors'
 import { cn, toISODate, addDays, startOfToday } from '@/lib/utils'
 import { Button } from '@/components/ui/primitives'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
+import { parseHandle } from '@/components/common/InstagramField'
 import { Sheet } from '@/components/ui/overlay'
 import { toast } from '@/components/ui/feedback'
 import type { ActivityType, ShootType, TaskPriority } from '@/data/types'
@@ -481,6 +482,7 @@ function ContactForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [email, setEmail] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? '')
   const [newCompany, setNewCompany] = useState('')
 
@@ -491,7 +493,15 @@ function ContactForm({ onDone }: { onDone: () => void }) {
     if (companyId === NEW && newCompany.trim()) {
       targetCompany = addCompany({ name: newCompany.trim() })
     }
-    const id = addContact({ name: name.trim(), role, email, companyId: targetCompany })
+    const id = addContact({
+      name: name.trim(),
+      role,
+      email,
+      companyId: targetCompany,
+      // Anything that is not a handle is dropped rather than stored as a link
+      // that goes nowhere. It can be added properly on the profile.
+      instagram: parseHandle(instagram),
+    })
     toast.success(`${name.trim()} added`, {
       action: { label: 'Open', onClick: () => navigate(`/contacts/${id}`) },
     })
@@ -518,6 +528,13 @@ function ContactForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
+      <Input
+        label="Instagram"
+        hint="Handle or a link to their profile"
+        placeholder="@studio"
+        value={instagram}
+        onChange={(e) => setInstagram(e.target.value)}
+      />
       <Select
         label="Company"
         value={companyId}

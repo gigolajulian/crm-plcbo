@@ -6,6 +6,7 @@ import { useActivityFeed, useContact } from '@/store/selectors'
 import { useUI } from '@/store/useUI'
 import { cn, formatRelativeDay, formatRelativeTime } from '@/lib/utils'
 import { PageHeader } from '@/components/common/PageHeader'
+import { InstagramField } from '@/components/common/InstagramField'
 import { Button, Card, Pill } from '@/components/ui/primitives'
 import { Avatar } from '@/components/ui/Avatar'
 import { Textarea } from '@/components/ui/form'
@@ -119,6 +120,18 @@ export default function ContactDetail() {
                   <a href={`tel:${contact.phone}`} className="underline-offset-2 hover:underline">
                     {contact.phone}
                   </a>
+                </dd>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <dt className="sr-only-focusable absolute">Instagram</dt>
+                <dd className="min-w-0 flex-1">
+                  <InstagramField
+                    value={contact.instagram}
+                    onChange={(instagram) => {
+                      updateContact(id, { instagram })
+                      toast.success(instagram ? `Linked @${instagram}` : 'Instagram removed')
+                    }}
+                  />
                 </dd>
               </div>
             </dl>

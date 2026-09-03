@@ -7,8 +7,9 @@ import { lineItemsTotal, useActivityFeed, useCompany } from '@/store/selectors'
 import { useUI } from '@/store/useUI'
 import { cn, daysFromToday, formatCurrency, formatDate, formatRelativeTime, pluralize, sum } from '@/lib/utils'
 import { PageHeader } from '@/components/common/PageHeader'
+import { InstagramField } from '@/components/common/InstagramField'
 import { Button, Card, Pill } from '@/components/ui/primitives'
-import { EmptyState } from '@/components/ui/feedback'
+import { EmptyState, toast } from '@/components/ui/feedback'
 import { CompanyMark } from '@/components/common/Img'
 import {
   ActivityDot,
@@ -26,6 +27,7 @@ export default function CompanyDetail() {
   const allShoots = useStore((s) => s.shoots)
   const pipeline = useStore((s) => s.pipeline)
   const openQuickAdd = useUI((s) => s.openQuickAdd)
+  const updateCompany = useStore((s) => s.updateCompany)
   const feed = useActivityFeed({ companyId: id }, 12)
   const allLicences = useStore((s) => s.licenses)
   const licences = useMemo(() => allLicences.filter((l) => l.companyId === id), [allLicences, id])
@@ -75,6 +77,13 @@ export default function CompanyDetail() {
               <ExternalLink size={13} aria-hidden />
               {company.website}
             </a>
+            <InstagramField
+              value={company.instagram}
+              onChange={(instagram) => {
+                updateCompany(id, { instagram })
+                toast.success(instagram ? `Linked @${instagram}` : 'Instagram removed')
+              }}
+            />
             <Pill tone="neutral">{company.size}</Pill>
             <Pill tone="neutral">Client since {formatDate(company.since)}</Pill>
           </>
@@ -85,7 +94,7 @@ export default function CompanyDetail() {
               Add contact
             </Button>
             <Button variant="primary" icon={<Plus size={16} />} onClick={() => openQuickAdd('shoot')}>
-              New deal
+              New shoot
             </Button>
           </>
         }

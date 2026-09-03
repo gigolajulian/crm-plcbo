@@ -45,6 +45,8 @@ export interface Contact {
   notes: string
   lastTouchedAt: ISODate
   favourite: boolean
+  /** Handle only, never a URL — see components/common/InstagramField. */
+  instagram?: string
   /** Pasted Gmail thread permalink. No OAuth — see README. */
   gmailThreadUrl?: string
 }
@@ -58,6 +60,7 @@ export interface Company {
   size: string
   tags: ID[]
   notes: string
+  instagram?: string
   /** Seed for the generated identity mark. */
   artSeed: string
   since: ISODate

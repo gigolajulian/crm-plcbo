@@ -207,8 +207,6 @@ export default function ContactsPage() {
 
                     <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line-soft pt-3 text-xs text-ink-muted">
                       <span>{pluralize(contactShoots.length, 'live shoot')}</span>
-                      <span aria-hidden>·</span>
-                      <span>{pluralize(contactShoots.length, 'deal')}</span>
                       <span
                         className={cn('ml-auto', stale && 'font-medium text-caution')}
                       >
