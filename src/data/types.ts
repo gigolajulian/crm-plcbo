@@ -320,6 +320,8 @@ export interface MoodPayloadImage {
   /** Aspect ratio, drives the masonry row span. */
   ratio: number
   credit?: string
+  /** The page this was pulled from — a Cosmos cluster, usually. */
+  sourceUrl?: string
 }
 export interface MoodPayloadLink {
   url: string
@@ -377,6 +379,10 @@ export interface Moodboard {
   shootId: ID
   title: string
   updatedAt: ISODate
+  /** A linked cosmos.so cluster. Validated to that host — see CosmosPanel. */
+  cosmosUrl?: string
+  /** What to call it on screen; Cosmos will not tell us, so the user does. */
+  cosmosTitle?: string
 }
 
 /* ------------------------------------------------ assets & approvals --- */

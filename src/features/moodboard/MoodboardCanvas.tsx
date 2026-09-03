@@ -35,6 +35,7 @@ import { Img } from '@/components/common/Img'
 import { Avatar } from '@/components/ui/Avatar'
 import { MoodItemBody, SortableMoodItem } from './MoodItemCard'
 import { AddReferenceSheet } from './AddReferenceSheet'
+import { CosmosPanel } from './CosmosPanel'
 
 /* ============================================================================
    MOODBOARD CANVAS
@@ -182,6 +183,8 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
 
   return (
     <div>
+      {board && <CosmosPanel board={board} />}
+
       {/* ------------------------------------------------------- toolbar */}
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <SearchInput

@@ -4,10 +4,12 @@ import type { ID, MoodItemKind, MoodPayload, MoodSection } from '@/data/types'
 import { useStore } from '@/store/useStore'
 import { PHOTO_SETS, photo, type PhotoSet } from '@/data/images'
 import { cn, hashCode, readableOn } from '@/lib/utils'
-import { Button, Pill } from '@/components/ui/primitives'
+import { Button, Pill, SegmentedControl } from '@/components/ui/primitives'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import { Sheet } from '@/components/ui/overlay'
 import { ImageDrop } from '@/components/common/ImageDrop'
+import { measurePastedUrls } from '@/lib/imageUrl'
+import { useClusterUrl } from './CosmosPanel'
 import type { UploadResult } from '@/lib/uploads'
 import { toast } from '@/components/ui/feedback'
 
@@ -61,12 +63,19 @@ export function AddReferenceSheet({
 }) {
   const addMoodItem = useStore((s) => s.addMoodItem)
   const currentUserId = useStore((s) => s.settings.currentUserId)
+  const clusterUrl = useClusterUrl(boardId)
 
   const [kind, setKind] = useState<Kind>('image')
   const [target, setTarget] = useState<ID>('')
   const [caption, setCaption] = useState('')
 
   // image
+  type ImageSource = 'paste' | 'upload' | 'library'
+  // Paste leads because it is the only one that works everywhere: the upload
+  // needs storage, and the library is a demo affordance.
+  const [source, setSource] = useState<ImageSource>('paste')
+  const [pasted, setPasted] = useState('')
+  const [importing, setImporting] = useState(false)
   const [set, setSet] = useState<PhotoSet>('interiors')
   const [pickedIndex, setPickedIndex] = useState(0)
   const [asMaterial, setAsMaterial] = useState(false)
@@ -98,12 +107,64 @@ export function AddReferenceSheet({
       setPickedIndex(0)
       setAsMaterial(false)
       setUploaded(null)
+      setPasted('')
+      setSource('paste')
     }
   }, [sectionId])
+
+  async function importPasted() {
+    const itemKind: MoodItemKind = asMaterial ? 'material' : 'image'
+    setImporting(true)
+    try {
+      const { ok, failed } = await measurePastedUrls(pasted)
+
+      for (const image of ok) {
+        addMoodItem({
+          boardId,
+          sectionId: target,
+          kind: itemKind,
+          payload: {
+            kind: itemKind as 'image' | 'material',
+            url: image.url,
+            artSeed: image.url,
+            ratio: image.ratio,
+            sourceUrl: clusterUrl,
+          },
+          caption: caption.trim(),
+          tags: [],
+          pinned: false,
+          addedBy: currentUserId,
+        })
+      }
+
+      if (ok.length === 0) {
+        toast.error('None of those could be loaded', {
+          detail: 'They need to be https links to an image file.',
+        })
+        return
+      }
+
+      // Say which ones failed rather than quietly dropping them.
+      toast.success(`${ok.length} reference${ok.length === 1 ? '' : 's'} added`, {
+        detail:
+          failed.length > 0
+            ? `${failed.length} could not be loaded: ${failed[0]}${failed.length > 1 ? ' …' : ''}`
+            : undefined,
+      })
+      onClose()
+    } finally {
+      setImporting(false)
+    }
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!target) return
+
+    if (kind === 'image' && source === 'paste') {
+      void importPasted()
+      return
+    }
 
     let payload: MoodPayload
     let itemKind: MoodItemKind = kind
@@ -111,8 +172,7 @@ export function AddReferenceSheet({
     switch (kind) {
       case 'image': {
         itemKind = asMaterial ? 'material' : 'image'
-        // An uploaded file wins over the library pick when there is one.
-        if (uploaded) {
+        if (source === 'upload' && uploaded) {
           payload = {
             kind: itemKind as 'image' | 'material',
             url: uploaded.url,
@@ -185,7 +245,7 @@ export function AddReferenceSheet({
 
   const valid =
     kind === 'image'
-      ? true
+      ? source !== 'paste' || pasted.trim().length > 0
       : kind === 'color'
         ? /^#?[0-9a-fA-F]{3,6}$/.test(hex)
         : kind === 'type'
@@ -238,12 +298,50 @@ export function AddReferenceSheet({
         {/* ----------------------------------------------------- image */}
         {kind === 'image' && (
           <div className="flex flex-col gap-3">
-            <ImageDrop
-              folder="moodboards"
-              label="Upload a reference"
-              onUploaded={setUploaded}
+            <SegmentedControl<ImageSource>
+              value={source}
+              onChange={setSource}
+              label="Where the image comes from"
+              size="sm"
+              segments={[
+                { value: 'paste', label: 'Paste a link' },
+                { value: 'upload', label: 'Upload' },
+                { value: 'library', label: 'Library' },
+              ]}
             />
 
+            {source === 'paste' && (
+              <Field
+                label="Image links"
+                htmlFor="paste-urls"
+                hint={
+                  clusterUrl
+                    ? 'One per line. Each will remember it came from the linked Cosmos board.'
+                    : 'One per line. Copy the image address from wherever it lives.'
+                }
+              >
+                <textarea
+                  id="paste-urls"
+                  value={pasted}
+                  onChange={(e) => setPasted(e.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  placeholder={['https://cdn.cosmos.so/…', 'https://cdn.cosmos.so/…'].join('\n')}
+                  className="w-full resize-y rounded-lg bg-raised px-3.5 py-3 font-mono text-xs leading-relaxed shadow-xs outline-none"
+                />
+              </Field>
+            )}
+
+            {source === 'upload' && (
+              <ImageDrop
+                folder="moodboards"
+                label="Upload a reference"
+                onUploaded={setUploaded}
+              />
+            )}
+
+            {source === 'library' && (
+            <>
             <Select
               label="Library"
               value={set}
@@ -255,7 +353,7 @@ export function AddReferenceSheet({
                 value: key,
                 label: key.charAt(0).toUpperCase() + key.slice(1),
               }))}
-              hint={uploaded ? "Your upload will be used instead." : "Or pick from the curated set."}
+              hint="Stand-in images, for when the real ones are not to hand."
             />
             <fieldset>
               <legend className="eyebrow mb-2">Pick one</legend>
@@ -284,6 +382,9 @@ export function AddReferenceSheet({
                 ))}
               </div>
             </fieldset>
+            </>
+            )}
+
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -291,7 +392,7 @@ export function AddReferenceSheet({
                 onChange={(e) => setAsMaterial(e.target.checked)}
                 className="size-4 accent-[#0a0a0a]"
               />
-              Tag this as a material or texture
+              Tag {source === 'paste' ? 'these' : 'this'} as a material or texture
             </label>
           </div>
         )}
@@ -439,8 +540,10 @@ export function AddReferenceSheet({
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={!valid}>
-            Add reference
+          {/* Each pasted link is loaded before it is added, so this can take
+              a moment on a slow connection and has to say so. */}
+          <Button type="submit" variant="primary" disabled={!valid || importing}>
+            {importing ? 'Loading the images…' : 'Add reference'}
           </Button>
         </div>
       </form>

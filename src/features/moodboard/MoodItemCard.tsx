@@ -32,6 +32,14 @@ export interface MoodItemCardProps {
 /** The card body, without any drag behaviour. Shared by the grid and the overlay. */
 export const MoodItemBody = forwardRef<HTMLDivElement, MoodItemCardProps & { dragging?: boolean }>(
   function MoodItemBody({ item, onOpen, onTogglePin, menuItems, onCaption, dragging, preview }, ref) {
+    // Only the visual payloads carry a source; the union does not share it.
+    const sourceUrl =
+      item.payload.kind === 'image' ||
+      item.payload.kind === 'shot' ||
+      item.payload.kind === 'material'
+        ? item.payload.sourceUrl
+        : undefined
+
     return (
       <div
         ref={ref}
@@ -75,6 +83,19 @@ export const MoodItemBody = forwardRef<HTMLDivElement, MoodItemCardProps & { dra
               )}
             </button>
           )}
+
+        {/* Where a pasted reference came from — a Cosmos board, usually. */}
+        {sourceUrl && !preview && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-pill bg-[#0a0a0a]/45 px-2 py-1 text-2xs text-[#f2f2f0] backdrop-blur-sm transition-colors duration-fast hover:bg-[#0a0a0a]/75"
+          >
+            <ExternalLink size={10} aria-hidden />
+            Source
+          </a>
+        )}
 
         {/* --------------------------------------------------------- colour */}
         {item.payload.kind === 'color' && (

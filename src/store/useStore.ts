@@ -16,6 +16,7 @@ import type {
   License,
   LineItem,
   Milestone,
+  Moodboard,
   MoodItem,
   MoodSection,
   PipelineStage,
@@ -94,6 +95,7 @@ type Actions = {
   updateMoodSection: (id: ID, patch: Partial<MoodSection>) => void
   deleteMoodSection: (id: ID) => void
   ensureMoodboard: (shootId: ID) => ID
+  updateMoodboard: (id: ID, patch: Partial<Moodboard>) => void
 
   /* assets, versions, approvals */
   addAssetVersion: (assetId: ID, draft: Partial<AssetVersion>) => ID
@@ -602,6 +604,11 @@ export const useStore = create<Store>()(
         }))
         return boardId
       },
+
+      updateMoodboard: (id, patch) =>
+        set((s) => ({
+          moodboards: patchIn(s.moodboards, id, { ...patch, updatedAt: nowISO() }),
+        })),
 
       addMoodItem: (item) => {
         const id = uid('mi')
