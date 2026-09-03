@@ -218,8 +218,10 @@ export function CosmosPanel({ board }: { board: Moodboard }) {
               className="h-[32rem] w-full border-0 bg-canvas-sunk"
             />
           </div>
-          <p className="px-4 py-2 text-2xs text-ink-faint">
-            Shown straight from cosmos.so. A private board will ask you to sign in here.
+          <p className="px-4 py-2 text-2xs text-pretty text-ink-faint">
+            Shown straight from cosmos.so, so it keeps their light theme — nothing here can
+            restyle someone else's page. Drag an image out of it onto this page to bring it
+            across as a real reference, in your own theme.
           </p>
         </div>
       )}

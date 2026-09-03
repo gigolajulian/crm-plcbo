@@ -18,6 +18,7 @@ import {
 import {
   FolderPlus,
   Images,
+  Loader2,
   Pin,
   Plus,
   Sparkles,
@@ -36,6 +37,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { MoodItemBody, SortableMoodItem } from './MoodItemCard'
 import { AddReferenceSheet } from './AddReferenceSheet'
 import { CosmosPanel } from './CosmosPanel'
+import { useBoardIntake } from './useBoardIntake'
 
 /* ============================================================================
    MOODBOARD CANVAS
@@ -112,6 +114,15 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  // Dropped and pasted references land in the first section, which is the one
+  // a board starts with and the one people mean by "the board".
+  const intake = useBoardIntake({
+    boardId: boardId ?? '',
+    sectionId: sections[0]?.id,
+    sourceUrl: board?.cosmosUrl,
+    enabled: Boolean(boardId) && sections.length > 0,
+  })
+
   if (!boardId) {
     return (
       <EmptyState
@@ -182,7 +193,35 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
   }
 
   return (
-    <div>
+    <div
+      className="relative"
+      onDragEnter={intake.handlers.onDragEnter}
+      onDragOver={intake.handlers.onDragOver}
+      onDragLeave={intake.handlers.onDragLeave}
+      onDrop={intake.handlers.onDrop}
+    >
+      {/*
+        The whole board is the drop target, not a small well inside it: the
+        gesture is "put this here", and asking someone to aim is a tax.
+      */}
+      {(intake.dropping || intake.busy) && (
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded-3xl border-2 border-dashed border-ink bg-canvas/85 backdrop-blur-sm">
+          <p className="flex items-center gap-2 text-lg font-medium">
+            {intake.busy ? (
+              <>
+                <Loader2 size={18} className="animate-spin" aria-hidden />
+                Loading the images…
+              </>
+            ) : (
+              <>
+                <Images size={18} aria-hidden />
+                Drop to add {board?.cosmosTitle ? `to ${board.title}` : 'references'}
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       {board && <CosmosPanel board={board} />}
 
       {/* ------------------------------------------------------- toolbar */}
@@ -243,8 +282,16 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
       {items.length === 0 ? (
         <EmptyState
           icon={<Sparkles size={20} />}
-          title="An empty board is a good place to start"
-          body="Drop in the photograph that started it, the colour you cannot stop thinking about, the typeface you want to argue for. Sort it out later."
+          title={
+            board?.cosmosUrl
+              ? 'Bring the Cosmos board across'
+              : 'An empty board is a good place to start'
+          }
+          body={
+            board?.cosmosUrl
+              ? 'Open it above, then drag the images straight onto this page — or copy an image address and paste it here. They arrive as references you can caption, pin and put in a call sheet, in your own dark room rather than behind glass.'
+              : 'Drop in the photograph that started it, the colour you cannot stop thinking about, the typeface you want to argue for. Sort it out later.'
+          }
           action={
             <Button variant="primary" icon={<Plus size={16} />} onClick={() => setAddingTo(sections[0]?.id ?? null)}>
               Add the first reference

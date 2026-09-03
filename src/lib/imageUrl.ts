@@ -106,3 +106,47 @@ export async function measurePastedUrls(text: string): Promise<PastedImages> {
     failed: results.filter((r) => !r.measured).map((r) => r.line),
   }
 }
+
+/* --------------------------------------------------------------- drops -- */
+
+/**
+ * Pulls image URLs out of a drag or a paste.
+ *
+ * Dragging a picture from another tab is how references actually move — it is
+ * the browser doing what browsers do, no API and no scraping. What lands in
+ * the DataTransfer varies by source: some pages hand over `text/uri-list`,
+ * some only `text/html` with the `<img>` in it, some just plain text. Read all
+ * three and take whatever looks like an image.
+ */
+export function urlsFromTransfer(data: DataTransfer): string[] {
+  const found: string[] = []
+
+  const uriList = data.getData('text/uri-list')
+  if (uriList) {
+    // The format is newline-separated with # comments.
+    found.push(...uriList.split('\n').filter((line) => line && !line.startsWith('#')))
+  }
+
+  const html = data.getData('text/html')
+  if (html) {
+    /*
+     * Parsed rather than pattern-matched, because the fragment is real HTML:
+     * a query string arrives escaped, and `?a=1&amp;b=2` picked out by a regex
+     * becomes a URL with a parameter called "amp;b". The parser decodes it.
+     * This never executes anything — the document is inert, and only the src
+     * attribute is read.
+     */
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    for (const img of doc.querySelectorAll('img')) {
+      const src = img.getAttribute('src')
+      // Absolute only; a relative src would resolve against our own origin.
+      if (src && /^https?:\/\//i.test(src)) found.push(src)
+    }
+  }
+
+  const text = data.getData('text/plain')
+  if (text) found.push(...text.split(/\s+/).filter((t) => t.startsWith('http')))
+
+  // A drag often carries the same image in two flavours; keep the first of each.
+  return [...new Set(found.map((u) => u.trim()).filter(Boolean))]
+}
