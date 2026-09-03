@@ -28,7 +28,7 @@ import type { ID, MoodItem, MoodItemKind } from '@/data/types'
 import { MOOD_KIND_LABELS } from '@/data/types'
 import { useStore } from '@/store/useStore'
 import { cn, matches, sortBy } from '@/lib/utils'
-import { Button, Chip, IconButton, Pill } from '@/components/ui/primitives'
+import { Button, Chip, IconButton, Pill, SegmentedControl } from '@/components/ui/primitives'
 import { InlineEdit, SearchInput } from '@/components/ui/form'
 import { ConfirmDialog, Lightbox } from '@/components/ui/overlay'
 import { EmptyState, NoResults, toast } from '@/components/ui/feedback'
@@ -37,6 +37,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { MoodItemBody, SortableMoodItem } from './MoodItemCard'
 import { AddReferenceSheet } from './AddReferenceSheet'
 import { CosmosPanel } from './CosmosPanel'
+import { CosmosBoard } from './CosmosBoard'
 import { useBoardIntake } from './useBoardIntake'
 
 /* ============================================================================
@@ -71,6 +72,12 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
   const [kinds, setKinds] = useState<MoodItemKind[]>([])
   const [pinnedOnly, setPinnedOnly] = useState(false)
   const [addingTo, setAddingTo] = useState<ID | null>(null)
+  /*
+   * A studio that builds every board on Cosmos should land on the Cosmos board.
+   * Undefined until the board is known, then resolved once — so switching to
+   * the references and back does not get overruled on the next render.
+   */
+  const [view, setView] = useState<'cosmos' | 'refs' | null>(null)
   const [lightboxId, setLightboxId] = useState<ID | null>(null)
   const [dragId, setDragId] = useState<ID | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ kind: 'item' | 'section'; id: ID } | null>(
@@ -192,6 +199,18 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
     ]
   }
 
+  const linked = Boolean(board?.cosmosUrl)
+  const showing = view ?? (linked ? 'cosmos' : 'refs')
+
+  if (linked && showing === 'cosmos' && board) {
+    return (
+      <div className="flex flex-col gap-3">
+        <BoardSwitch value="cosmos" onChange={setView} count={items.length} />
+        <CosmosBoard board={board} />
+      </div>
+    )
+  }
+
   return (
     <div
       className="relative"
@@ -222,6 +241,7 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
         </div>
       )}
 
+      {linked && <BoardSwitch value="refs" onChange={setView} count={items.length} className="mb-4" />}
       {board && <CosmosPanel board={board} />}
 
       {/* ------------------------------------------------------- toolbar */}
@@ -289,7 +309,7 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
           }
           body={
             board?.cosmosUrl
-              ? 'Open it above, then drag the images straight onto this page — or copy an image address and paste it here. They arrive as references you can caption, pin and put in a call sheet, in your own dark room rather than behind glass.'
+              ? 'The Cosmos board is the other tab above. Anything you want to keep here as well — right-click an image in Cosmos, copy its address, and paste it on this page. It arrives as a reference you can caption, pin and put in a call sheet.'
               : 'Drop in the photograph that started it, the colour you cannot stop thinking about, the typeface you want to argue for. Sort it out later.'
           }
           action={
@@ -523,5 +543,38 @@ export function MoodboardCanvas({ shootId }: { shootId: ID }) {
         }}
       />
     </div>
+  )
+}
+
+/* --------------------------------------------------------------- switch -- */
+
+/**
+ * Two views of one moodboard: the Cosmos board as it really is, and the
+ * references held here. Only shown once a Cosmos board is linked — with none,
+ * there is nothing to switch between.
+ */
+function BoardSwitch({
+  value,
+  onChange,
+  count,
+  className,
+}: {
+  value: 'cosmos' | 'refs'
+  onChange: (next: 'cosmos' | 'refs') => void
+  count: number
+  className?: string
+}) {
+  return (
+    <SegmentedControl<'cosmos' | 'refs'>
+      value={value}
+      onChange={onChange}
+      label="Which board"
+      size="sm"
+      className={cn('self-start', className)}
+      segments={[
+        { value: 'cosmos', label: 'Cosmos board' },
+        { value: 'refs', label: count > 0 ? `References · ${count}` : 'References' },
+      ]}
+    />
   )
 }
