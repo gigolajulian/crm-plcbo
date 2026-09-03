@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { CalendarRange, Columns3, GripVertical, LayoutGrid, List, Plus } from 'lucide-react'
+import { CalendarRange, Columns3, GripVertical, Images, LayoutGrid, List, Plus } from 'lucide-react'
 import type { ID, PipelineStage, Shoot } from '@/data/types'
 import { SHOOT_TYPES, STAGE_KINDS } from '@/data/types'
 import { useStore } from '@/store/useStore'
@@ -31,13 +31,15 @@ import { Button, SegmentedControl } from '@/components/ui/primitives'
 import { EmptyState, NoResults, toast } from '@/components/ui/feedback'
 import { Menu } from '@/components/ui/overlay'
 import { ShootBoardCard, ShootCard, ShootRow } from './ShootCard'
+import { ShootBoards } from './ShootBoards'
 import { ShootTimeline } from './ShootTimeline'
 
-type View = 'gallery' | 'board' | 'timeline' | 'list'
+type View = 'gallery' | 'board' | 'boards' | 'timeline' | 'list'
 
 const VIEWS = [
   { value: 'gallery' as const, label: 'Gallery', icon: <LayoutGrid size={14} /> },
   { value: 'board' as const, label: 'Board', icon: <Columns3 size={14} /> },
+  { value: 'boards' as const, label: 'Moodboards', icon: <Images size={14} /> },
   { value: 'timeline' as const, label: 'Timeline', icon: <CalendarRange size={14} /> },
   { value: 'list' as const, label: 'List', icon: <List size={14} /> },
 ]
@@ -259,6 +261,8 @@ export default function ShootsPage() {
         <GalleryView shoots={filtered} />
       ) : view === 'board' ? (
         <BoardView shoots={filtered} />
+      ) : view === 'boards' ? (
+        <ShootBoards shoots={filtered} />
       ) : view === 'timeline' ? (
         <ShootTimeline shoots={filtered} />
       ) : (

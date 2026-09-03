@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { MessageSquare, Paperclip } from 'lucide-react'
+import { Images, MessageSquare, Paperclip } from 'lucide-react'
 import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
 import { useShootVitals } from '@/store/selectors'
@@ -8,6 +8,14 @@ import { Card, Meter, Pill, ProgressRing } from '@/components/ui/primitives'
 import { AvatarStack } from '@/components/ui/Avatar'
 import { Img } from '@/components/common/Img'
 import { DueBadge, HealthBadge, StageBadge, TagList } from '@/components/common/records'
+
+/** References held on this shoot's board. Counted here, not in a selector. */
+function useReferenceCount(shootId: string) {
+  const boards = useStore((s) => s.moodboards)
+  const items = useStore((s) => s.moodItems)
+  const board = boards.find((b) => b.shootId === shootId)
+  return board ? items.filter((i) => i.boardId === board.id).length : 0
+}
 
 /**
  * The gallery shoot card.
@@ -26,6 +34,7 @@ export function ShootCard({
   const team = useStore((s) => s.team)
   const company = useStore((s) => s.companies.find((c) => c.id === shoot.companyId))
   const vitals = useShootVitals(shoot.id)
+  const references = useReferenceCount(shoot.id)
 
   const members = team.filter((m) => shoot.memberIds.includes(m.id))
   const owner = team.find((m) => m.id === shoot.ownerId)
@@ -118,7 +127,17 @@ export function ShootCard({
               max={4}
               size="xs"
             />
-            <div className="flex items-center gap-3 text-xs text-ink-faint">
+            <div className="relative z-10 flex items-center gap-3 text-xs text-ink-faint">
+              {references > 0 && (
+                <Link
+                  to={`/shoots/${shoot.id}?tab=moodboard`}
+                  className="flex items-center gap-1 transition-colors duration-fast hover:text-ink"
+                  title={pluralize(references, 'reference')}
+                >
+                  <Images size={12} aria-hidden />
+                  <span className="tabular">{references}</span>
+                </Link>
+              )}
               {vitals.openTasks > 0 && (
                 <span className="flex items-center gap-1" title={pluralize(vitals.openTasks, 'open task')}>
                   <Paperclip size={12} aria-hidden />

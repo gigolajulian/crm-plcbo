@@ -31,10 +31,8 @@ import { Img } from '@/components/common/Img'
 import {
   ActivityDot,
   DueBadge,
-  HealthBadge,
   LinkedRecord,
   SectionHeading,
-  StageBadge,
   TagList,
   TaskCheck,
 } from '@/components/common/records'
@@ -48,6 +46,12 @@ import { ReviewRoom } from '@/features/approvals/ReviewRoom'
 import { ShootBrief } from './ShootBrief'
 
 type Tab = 'overview' | 'moodboard' | 'tasks' | 'work' | 'activity'
+
+const HEALTH_LABELS = {
+  'on-track': 'On track',
+  'at-risk': 'At risk',
+  blocked: 'Blocked',
+} as const
 
 export default function ShootDetail() {
   const { id = '' } = useParams()
@@ -102,8 +106,6 @@ export default function ShootDetail() {
         meta={
           <>
             <Pill tone="neutral">{shoot.code}</Pill>
-            <StageBadge stageId={shoot.stageId} size="md" />
-            <HealthBadge health={shoot.health} size="md" />
             <DueBadge
               date={vitals.nextShootDate ?? shoot.expectedCloseDate}
               size="md"
@@ -134,7 +136,7 @@ export default function ShootDetail() {
             <Menu
               label="Change health"
               items={(['on-track', 'at-risk', 'blocked'] as const).map((health) => ({
-                label: health === 'on-track' ? 'On track' : health === 'at-risk' ? 'At risk' : 'Blocked',
+                label: HEALTH_LABELS[health],
                 selected: health === shoot.health,
                 onSelect: () => {
                   updateShoot(shoot.id, { health })
@@ -143,7 +145,7 @@ export default function ShootDetail() {
               }))}
               trigger={({ onClick, ...rest }) => (
                 <Button onClick={onClick} {...rest}>
-                  Health
+                  Health: {HEALTH_LABELS[shoot.health]}
                 </Button>
               )}
             />

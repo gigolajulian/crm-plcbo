@@ -144,7 +144,7 @@ function PriorityPanel({ actions }: { actions: ReturnType<typeof usePriorityActi
           title="You are completely clear"
           body="No overdue work, no reviews waiting, nothing due in the next few days. Good time to start something."
           action={
-            <ButtonLink to="/moodboards" variant="primary">
+            <ButtonLink to="/shoots?view=boards" variant="primary">
               Open a moodboard
             </ButtonLink>
           }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Camera,
+  ChevronRight,
   CheckSquare,
   MessageSquare,
   User,
@@ -26,6 +27,9 @@ import type { QuickAddMode } from '@/store/useUI'
    ========================================================================== */
 
 type Mode = QuickAddMode
+
+/** Sentinel value for the "create it inline" option in a picker. */
+const NEW = '__new'
 
 const MODES: Array<{ id: Mode; label: string; icon: LucideIcon }> = [
   { id: 'task', label: 'Task', icon: CheckSquare },
@@ -90,7 +94,7 @@ function TaskForm({ onDone }: { onDone: () => void }) {
   const currentUserId = useStore((s) => s.settings.currentUserId)
 
   const [title, setTitle] = useState('')
-  const [shootId, setProjectId] = useState('')
+  const [shootId, setShootId] = useState('')
   const [assigneeId, setAssigneeId] = useState(currentUserId)
   const [priority, setPriority] = useState<TaskPriority>('normal')
   const [due, setDue] = useState(toISODate(addDays(startOfToday(), 1)))
@@ -121,10 +125,10 @@ function TaskForm({ onDone }: { onDone: () => void }) {
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
-          label="Project"
-          placeholder="No project"
+          label="Shoot"
+          placeholder="No shoot"
           value={shootId}
-          onChange={(e) => setProjectId(e.target.value)}
+          onChange={(e) => setShootId(e.target.value)}
           options={shoots
             .filter((p) => !p.archived)
             .map((p) => ({ value: p.id, label: p.name }))}
@@ -173,7 +177,7 @@ function LogForm({ onDone }: { onDone: () => void }) {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [contactId, setContactId] = useState('')
-  const [shootId, setProjectId] = useState('')
+  const [shootId, setShootId] = useState('')
   const [followUp, setFollowUp] = useState('')
 
   function submit(event: React.FormEvent) {
@@ -236,10 +240,10 @@ function LogForm({ onDone }: { onDone: () => void }) {
           options={contacts.map((c) => ({ value: c.id, label: c.name }))}
         />
         <Select
-          label="Project"
-          placeholder="No project"
+          label="Shoot"
+          placeholder="No shoot"
           value={shootId}
-          onChange={(e) => setProjectId(e.target.value)}
+          onChange={(e) => setShootId(e.target.value)}
           options={shoots.map((p) => ({ value: p.id, label: p.name }))}
         />
       </div>
@@ -265,6 +269,8 @@ function LogForm({ onDone }: { onDone: () => void }) {
  */
 function ShootForm({ onDone }: { onDone: () => void }) {
   const addShoot = useStore((s) => s.addShoot)
+  const addCompany = useStore((s) => s.addCompany)
+  const addContact = useStore((s) => s.addContact)
   const companies = useStore((s) => s.companies)
   const contacts = useStore((s) => s.contacts)
   const leadSources = useStore((s) => s.leadSources)
@@ -274,8 +280,10 @@ function ShootForm({ onDone }: { onDone: () => void }) {
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? '')
+  const [companyId, setCompanyId] = useState(companies[0]?.id ?? NEW)
+  const [newCompany, setNewCompany] = useState('')
   const [contactId, setContactId] = useState('')
+  const [newContact, setNewContact] = useState('')
   const [ownerId, setOwnerId] = useState(currentUserId)
   const [shootType, setShootType] = useState<ShootType>('commercial')
   const [stageId, setStageId] = useState(pipeline[0]?.id ?? '')
@@ -283,21 +291,44 @@ function ShootForm({ onDone }: { onDone: () => void }) {
   const [fee, setFee] = useState('')
   const [close, setClose] = useState(toISODate(addDays(startOfToday(), 30)))
 
-  const companyContacts = contacts.filter((c) => c.companyId === companyId)
+  /*
+   * The picker used to show only the chosen client's own people, which meant a
+   * client with nobody on file — or a workspace with no companies at all — left
+   * the form permanently disabled and no way out of it. Every contact is now
+   * reachable, the client's own listed first, and both a company and a person
+   * can be created from right here.
+   */
+  const ownContacts = contacts.filter((c) => c.companyId === companyId)
+  const otherContacts = contacts.filter((c) => c.companyId !== companyId)
+  const companyName = (id: string) => companies.find((c) => c.id === id)?.name
 
   useEffect(() => {
-    setContactId(companyContacts[0]?.id ?? '')
+    setContactId(ownContacts[0]?.id ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId])
 
+  const clientNamed = companyId === NEW ? newCompany.trim().length > 0 : companyId.length > 0
+
   function submit(event: React.FormEvent) {
     event.preventDefault()
-    if (!name.trim() || !companyId || !contactId) return
+    if (!name.trim() || !clientNamed) return
+
+    // Resolve the client and the person first — a shoot created against a
+    // half-made client is worse than one created against none.
+    const resolvedCompany =
+      companyId === NEW ? addCompany({ name: newCompany.trim() }) : companyId
+    const resolvedContact =
+      contactId === NEW && newContact.trim()
+        ? addContact({ name: newContact.trim(), companyId: resolvedCompany })
+        : contactId === NEW
+          ? ''
+          : contactId
+
     const amount = Number(fee) || 0
     const id = addShoot({
       name: name.trim(),
-      companyId,
-      contactId,
+      companyId: resolvedCompany,
+      contactId: resolvedContact,
       ownerId,
       shootType,
       stageId,
@@ -333,75 +364,107 @@ function ShootForm({ onDone }: { onDone: () => void }) {
           required
           value={companyId}
           onChange={(e) => setCompanyId(e.target.value)}
-          options={companies.map((company) => ({ value: company.id, label: company.name }))}
+          options={[
+            ...companies.map((company) => ({ value: company.id, label: company.name })),
+            { value: NEW, label: '+ New client…' },
+          ]}
         />
         <Select
           label="Contact"
-          required
-          placeholder={companyContacts.length === 0 ? 'No one at this client yet' : undefined}
+          hint="Optional — you can add one later"
+          placeholder="Nobody yet"
           value={contactId}
           onChange={(e) => setContactId(e.target.value)}
-          options={companyContacts.map((contact) => ({ value: contact.id, label: contact.name }))}
+          options={[
+            ...ownContacts.map((contact) => ({ value: contact.id, label: contact.name })),
+            ...otherContacts.map((contact) => ({
+              value: contact.id,
+              label: companyName(contact.companyId)
+                ? `${contact.name} · ${companyName(contact.companyId)}`
+                : contact.name,
+            })),
+            { value: NEW, label: '+ New contact…' },
+          ]}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Select
-          label="Type"
-          value={shootType}
-          onChange={(e) => setShootType(e.target.value as ShootType)}
-          options={SHOOT_TYPES.map((type) => ({ value: type.id, label: type.label }))}
-        />
-        <Select
-          label="Stage"
-          value={stageId}
-          onChange={(e) => setStageId(e.target.value)}
-          options={pipeline.map((stage) => ({ value: stage.id, label: stage.name }))}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Select
-          label="How did they find you?"
-          hint="Drives the lead source report"
-          placeholder="Not recorded"
-          value={leadSourceId}
-          onChange={(e) => setLeadSourceId(e.target.value)}
-          options={leadSources
-            .filter((source) => source.active)
-            .map((source) => ({ value: source.id, label: source.label }))}
-        />
-        <Select
-          label="Owner"
-          value={ownerId}
-          onChange={(e) => setOwnerId(e.target.value)}
-          options={team.map((member) => ({ value: member.id, label: member.name }))}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {companyId === NEW && (
         <Input
-          label="Opening fee"
-          hint="Break it into line items later"
-          type="number"
-          min="0"
-          step="100"
-          value={fee}
-          onChange={(e) => setFee(e.target.value)}
-          placeholder="0"
+          label="New client name"
+          placeholder="Marrow & Co."
+          value={newCompany}
+          onChange={(e) => setNewCompany(e.target.value)}
+          required
         />
+      )}
+
+      {contactId === NEW && (
         <Input
-          label="Expected close"
-          type="date"
-          value={close}
-          onChange={(e) => setClose(e.target.value)}
+          label="New contact name"
+          placeholder="Alex Moreau"
+          value={newContact}
+          onChange={(e) => setNewContact(e.target.value)}
         />
-      </div>
+      )}
+
+      <Select
+        label="Type"
+        value={shootType}
+        onChange={(e) => setShootType(e.target.value as ShootType)}
+        options={SHOOT_TYPES.map((type) => ({ value: type.id, label: type.label }))}
+      />
+
+      {/*
+        Everything below has a working default. Kept folded so the common case
+        is four fields, not nine, and still one click away when it matters.
+      */}
+      <Disclosure summary="Stage, owner, fee and dates">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Select
+            label="Stage"
+            value={stageId}
+            onChange={(e) => setStageId(e.target.value)}
+            options={pipeline.map((stage) => ({ value: stage.id, label: stage.name }))}
+          />
+          <Select
+            label="Owner"
+            value={ownerId}
+            onChange={(e) => setOwnerId(e.target.value)}
+            options={team.map((member) => ({ value: member.id, label: member.name }))}
+          />
+          <Select
+            label="How did they find you?"
+            hint="Drives the lead source report"
+            placeholder="Not recorded"
+            value={leadSourceId}
+            onChange={(e) => setLeadSourceId(e.target.value)}
+            options={leadSources
+              .filter((source) => source.active)
+              .map((source) => ({ value: source.id, label: source.label }))}
+          />
+          <Input
+            label="Opening fee"
+            hint="Break it into line items later"
+            type="number"
+            min="0"
+            step="100"
+            value={fee}
+            onChange={(e) => setFee(e.target.value)}
+            placeholder="0"
+          />
+          <Input
+            label="Expected close"
+            type="date"
+            value={close}
+            onChange={(e) => setClose(e.target.value)}
+          />
+        </div>
+      </Disclosure>
 
       <FormActions
         onCancel={onDone}
         label="Create shoot"
-        disabled={!name.trim() || !contactId}
+        disabled={!name.trim() || !clientNamed}
       />
     </form>
   )
@@ -425,7 +488,7 @@ function ContactForm({ onDone }: { onDone: () => void }) {
     event.preventDefault()
     if (!name.trim()) return
     let targetCompany = companyId
-    if (companyId === '__new' && newCompany.trim()) {
+    if (companyId === NEW && newCompany.trim()) {
       targetCompany = addCompany({ name: newCompany.trim() })
     }
     const id = addContact({ name: name.trim(), role, email, companyId: targetCompany })
@@ -461,10 +524,10 @@ function ContactForm({ onDone }: { onDone: () => void }) {
         onChange={(e) => setCompanyId(e.target.value)}
         options={[
           ...companies.map((c) => ({ value: c.id, label: c.name })),
-          { value: '__new', label: '+ New company…' },
+          { value: NEW, label: '+ New company…' },
         ]}
       />
-      {companyId === '__new' && (
+      {companyId === NEW && (
         <Input
           label="New company name"
           placeholder="Company name"
@@ -479,6 +542,26 @@ function ContactForm({ onDone }: { onDone: () => void }) {
 }
 
 /* --------------------------------------------------------------- shared -- */
+
+/**
+ * A native <details> rather than a controlled panel: it keeps its own state,
+ * is open to find-in-page, and needs no keyboard handling of our own.
+ */
+function Disclosure({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="group rounded-xl bg-canvas-sunk px-4 py-3">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-ink-muted transition-colors duration-fast hover:text-ink">
+        <ChevronRight
+          size={14}
+          aria-hidden
+          className="transition-transform duration-fast group-open:rotate-90"
+        />
+        {summary}
+      </summary>
+      <div className="pt-4">{children}</div>
+    </details>
+  )
+}
 
 function FormActions({
   onCancel,

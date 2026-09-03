@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Check, Pencil, Target } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Check, Images, Pencil, Target } from 'lucide-react'
 import type { Shoot } from '@/data/types'
 import { useStore } from '@/store/useStore'
-import { cn, formatCurrency, sum } from '@/lib/utils'
+import { cn, formatCurrency, sortBy, sum } from '@/lib/utils'
 import { lineItemsTotal } from '@/store/selectors'
 import { Button, Card, Pill } from '@/components/ui/primitives'
 import { Textarea } from '@/components/ui/form'
+import { Img } from '@/components/common/Img'
 import { SectionHeading, TaskCheck } from '@/components/common/records'
 import { PersonCell } from '@/components/common/records'
 import { toast } from '@/components/ui/feedback'
@@ -138,10 +140,73 @@ export function ShootBrief({ shoot }: { shoot: Shoot }) {
 
       {/* ----------------------------------------------------- side rail */}
       <div className="flex flex-col gap-5">
+        <BoardStrip shoot={shoot} />
         <Deliverables shoot={shoot} />
         <ClientContext shoot={shoot} />
       </div>
     </div>
+  )
+}
+
+/* ------------------------------------------------------------- board -- */
+
+/**
+ * The references, next to the direction they illustrate. The full board is a
+ * tab of its own, but a brief that describes a look with no picture of it is
+ * half a brief — so the first few sit here, in the reading column's rail.
+ */
+function BoardStrip({ shoot }: { shoot: Shoot }) {
+  const boards = useStore((s) => s.moodboards)
+  const items = useStore((s) => s.moodItems)
+  const board = boards.find((b) => b.shootId === shoot.id)
+  const all = board ? items.filter((i) => i.boardId === board.id) : []
+  const visual = sortBy(
+    all.filter((i) => i.kind === 'image' || i.kind === 'shot' || i.kind === 'material'),
+    (i) => (i.pinned ? 0 : 1),
+  ).slice(0, 6)
+
+  return (
+    <Card variant="surface" padding="md" radius="2xl">
+      <SectionHeading
+        title="References"
+        count={all.length}
+        action={
+          <Link
+            to={`/shoots/${shoot.id}?tab=moodboard`}
+            className="flex items-center gap-1.5 text-xs font-medium text-ink-muted transition-colors duration-fast hover:text-ink"
+          >
+            <Images size={12} aria-hidden />
+            {all.length === 0 ? 'Start the board' : 'Open board'}
+          </Link>
+        }
+      />
+
+      {visual.length === 0 ? (
+        <p className="py-3 text-sm text-ink-muted">
+          Nothing pinned yet. The board holds images, colours, type and materials.
+        </p>
+      ) : (
+        <ul className="mt-1 grid grid-cols-3 gap-1.5">
+          {visual.map((item) => (
+            <li key={item.id}>
+              <Link
+                to={`/shoots/${shoot.id}?tab=moodboard`}
+                className="block overflow-hidden rounded-lg"
+                aria-label={item.caption || 'Open the moodboard'}
+              >
+                <Img
+                  src={item.payload.kind === 'image' || item.payload.kind === 'shot' || item.payload.kind === 'material' ? item.payload.url : undefined}
+                  seed={`${shoot.id}-${item.id}`}
+                  alt=""
+                  ratio={1}
+                  className="w-full transition-transform duration-slow ease-out-soft hover:scale-[1.06]"
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }
 

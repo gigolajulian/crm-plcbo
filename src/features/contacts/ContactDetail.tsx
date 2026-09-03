@@ -247,7 +247,7 @@ export default function ContactDetail() {
         {/* ------------------------------------------------------- right */}
         <div className="flex flex-col gap-5">
           <section>
-            <SectionHeading title="Projects" count={contactShoots.length} />
+            <SectionHeading title="Shoots" count={contactShoots.length} />
             {contactShoots.length === 0 ? (
               <EmptyState
                 title="No contactShoots with this client yet"

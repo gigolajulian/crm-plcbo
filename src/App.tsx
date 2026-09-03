@@ -10,7 +10,6 @@ import { ErrorState } from '@/components/ui/feedback'
 const Dashboard = lazy(() => import('@/features/dashboard/DashboardPage'))
 const ShootsPage = lazy(() => import('@/features/shoots/ShootsPage'))
 const ShootDetail = lazy(() => import('@/features/shoots/ShootDetail'))
-const MoodboardIndex = lazy(() => import('@/features/moodboard/MoodboardIndex'))
 const ContactsPage = lazy(() => import('@/features/contacts/ContactsPage'))
 const ContactDetail = lazy(() => import('@/features/contacts/ContactDetail'))
 const CompanyDetail = lazy(() => import('@/features/contacts/CompanyDetail'))
@@ -53,7 +52,8 @@ export default function App() {
             <Route path="/projects/:id" element={<LegacyShootRedirect />} />
             <Route path="/deals" element={<Navigate to="/shoots?view=board" replace />} />
             <Route path="/deals/:id" element={<LegacyShootRedirect />} />
-            <Route path="/moodboards" element={<MoodboardIndex />} />
+            {/* Moodboards are a view on the shoots page now, not a section. */}
+            <Route path="/moodboards" element={<Navigate to="/shoots?view=boards" replace />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/contacts/:id" element={<ContactDetail />} />
             <Route path="/companies" element={<ContactsPage />} />
@@ -103,7 +103,7 @@ function NotFound() {
         <ButtonLink to="/" variant="primary">
           Back to Today
         </ButtonLink>
-        <ButtonLink to="/projects">Browse projects</ButtonLink>
+        <ButtonLink to="/shoots">Browse shoots</ButtonLink>
       </div>
     </div>
   )

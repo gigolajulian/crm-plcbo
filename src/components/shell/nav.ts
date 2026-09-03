@@ -5,7 +5,6 @@ import {
   Receipt,
   Scale,
   LayoutGrid,
-  Images,
   PieChart,
   Settings,
   Stamp,
@@ -29,7 +28,6 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { to: '/', label: 'Today', icon: LayoutGrid, key: 'h', group: 'work' },
   { to: '/shoots', label: 'Shoots', icon: Camera, key: 'p', group: 'work' },
-  { to: '/moodboards', label: 'Moodboards', icon: Images, key: 'm', group: 'work' },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare, key: 't', group: 'work' },
   { to: '/approvals', label: 'Approvals', icon: Stamp, key: 'r', group: 'work' },
   { to: '/billing', label: 'Billing', icon: Receipt, key: 'b', group: 'work' },
@@ -40,7 +38,14 @@ export const NAV: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: Settings, key: 's', group: 'studio' },
 ]
 
-/** The five that fit on a phone. */
-export const MOBILE_NAV = NAV.filter((item) =>
-  ['/', '/projects', '/tasks', '/deals', '/contacts'].includes(item.to),
-)
+/**
+ * The five that fit on a phone. Written as an ordered list rather than a
+ * filter over NAV so the order is deliberate — and so a renamed route shows up
+ * as an empty tab bar in review rather than silently dropping an item, which is
+ * exactly what happened when projects and deals became shoots.
+ */
+const MOBILE_ROUTES = ['/', '/shoots', '/tasks', '/billing', '/contacts']
+
+export const MOBILE_NAV = MOBILE_ROUTES.map(
+  (route) => NAV.find((item) => item.to === route)!,
+).filter(Boolean)
