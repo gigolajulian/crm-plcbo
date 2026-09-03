@@ -55,8 +55,17 @@ export function shootEnd(shoot: Shoot): string {
 /**
  * Never returns undefined. The top bar and half the app read `.name` off this
  * without guarding, so an empty roster — or a currentUserId pointing at someone
- * who has been removed — used to crash the whole tree. Falls back to the
- * workspace owner, who always exists as an identity even if the team does not.
+ * who has been removed — used to crash the whole tree.
+ *
+ * It used to fall back to `team[0]`, and that was worse than crashing: on a
+ * workspace hydrated with the sample roster, an unmatched currentUserId made
+ * you the first person on it. The app greeted you by a demo character's name,
+ * and Settings could not fix it — saving "Your name" patches the record
+ * currentUserId points at, which was nobody, so the rename went nowhere while
+ * the greeting kept reading someone else.
+ *
+ * So: the owner's own profile is the fallback. It is the field Settings labels
+ * "Your name", which makes the two impossible to disagree.
  */
 export function useCurrentUser(): TeamMember {
   const team = useStore((s) => s.team)
@@ -64,7 +73,7 @@ export function useCurrentUser(): TeamMember {
   const workspace = useStore((s) => s.settings.workspace)
 
   return useMemo(() => {
-    const found = team.find((m) => m.id === id) ?? team[0]
+    const found = team.find((m) => m.id === id)
     if (found) return found
     return {
       id: id || 'tm_owner',

@@ -115,6 +115,8 @@ function AccountSettings() {
   const workspace = useStore((s) => s.settings.workspace)
   const updateWorkspace = useStore((s) => s.updateWorkspace)
   const updateTeamMember = useStore((s) => s.updateTeamMember)
+  const addTeamMember = useStore((s) => s.addTeamMember)
+  const updateSettings = useStore((s) => s.updateSettings)
   const currentUserId = useStore((s) => s.settings.currentUserId)
   const me = useStore((s) => s.team.find((m) => m.id === s.settings.currentUserId))
 
@@ -150,12 +152,23 @@ function AccountSettings() {
       ownerAvatar: avatar,
     })
     // The owner's profile and their team record are the same person.
-    updateTeamMember(currentUserId, {
-      name: name.trim() || workspace.ownerName,
-      role: role.trim() || me?.role,
-      email: email.trim() || me?.email,
-      avatar,
-    })
+    //
+    // Unless currentUserId points at nobody — which happens on a workspace
+    // hydrated from elsewhere — in which case patching it renames no one and
+    // the studio goes on calling you by whatever name it already had. Give
+    // yourself a record and claim it.
+    if (me) {
+      updateTeamMember(currentUserId, {
+        name: name.trim() || workspace.ownerName,
+        role: role.trim() || me.role,
+        email: email.trim() || me.email,
+        avatar,
+      })
+    } else {
+      const id = addTeamMember(name.trim() || workspace.ownerName, role.trim(), email.trim())
+      updateTeamMember(id, { avatar, permissionRole: 'owner' })
+      updateSettings({ currentUserId: id })
+    }
     toast.success('Saved')
   }
 
