@@ -2,6 +2,7 @@ import type { Database } from '@/data/types'
 import { COLLECTIONS, TABLES, fromRow, toRow, type CollectionKey } from '@/data/schema'
 import { requireSupabase } from '@/lib/supabase'
 import { useStore } from './useStore'
+import { toast } from '@/components/ui/feedback'
 
 /* ============================================================================
    SYNC
@@ -27,6 +28,10 @@ let timer: number | undefined
 let applyingRemote = false
 
 const pending = new Set<CollectionKey>()
+/** Tables already complained about, so a retry loop cannot spam. */
+const reported = new Set<CollectionKey>()
+/** Set while a slow retry is armed for writes that keep failing. */
+let retryTimer: number | undefined
 
 /** Stable identity for a record, used to detect "did this actually change". */
 function fingerprint(record: unknown): string {
@@ -122,6 +127,41 @@ export async function hydrate(ws: string): Promise<boolean> {
   return true
 }
 
+/* ---------------------------------------------------------------- errors -- */
+
+/**
+ * A write that will not land has to say so.
+ *
+ * It used to be a console.error, which meant a column the database did not
+ * have yet — a migration not run — looked exactly like everything working.
+ * The change stayed in this browser, the retry failed forever in silence, and
+ * the next sign-in hydrated the old row over the top of it. Whatever you had
+ * just done was simply gone, with nothing on screen having suggested it might.
+ */
+function report(key: CollectionKey, table: string, error: unknown) {
+  if (reported.has(key)) return
+  reported.add(key)
+
+  const message = (error as { message?: string })?.message ?? String(error)
+  // PostgREST says "Could not find the 'x' column of 'y' in the schema cache".
+  const schema = /column|schema cache/i.test(message)
+
+  toast.error(schema ? `Your database is missing a column` : `Could not save to ${table}`, {
+    detail: schema
+      ? `${table} is behind this version of the app, so that change is saved on this device only. Run the migrations in supabase/migrations, then edit anything to push it up. (${message})`
+      : message,
+  })
+}
+
+/** Keep trying, slowly, so running the migration is enough to heal it. */
+function armRetry() {
+  if (pending.size === 0 || retryTimer) return
+  retryTimer = window.setTimeout(() => {
+    retryTimer = undefined
+    void flush()
+  }, 20_000)
+}
+
 /* ----------------------------------------------------------------- flush -- */
 
 async function flush() {
@@ -161,13 +201,17 @@ async function flush() {
       }
 
       snapshot[key] = after
+      reported.delete(key)
     } catch (error) {
       // Keep the old snapshot so the change is retried on the next flush
       // rather than being silently dropped.
       pending.add(key)
       console.error(`[crmo] sync failed for ${spec.table}`, error)
+      report(key, spec.table, error)
     }
   }
+
+  armRetry()
 
   // Settings ride along with whatever else changed.
   await supabase.from('user_settings').upsert(
@@ -224,7 +268,10 @@ export function stopSync() {
   workspaceId = null
   snapshot = {}
   pending.clear()
+  reported.clear()
   window.clearTimeout(timer)
+  window.clearTimeout(retryTimer)
+  retryTimer = undefined
 }
 
 export interface PushProgress {
