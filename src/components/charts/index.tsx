@@ -166,7 +166,7 @@ export function HatchArea({
           </g>
         )}
       </svg>
-      <div className="mt-1.5 flex justify-between text-xs text-ink-faint">
+      <div className="mt-1.5 flex justify-between text-xs opacity-70">
         {labels.map((label) => (
           <span key={label}>{label}</span>
         ))}
@@ -230,7 +230,7 @@ export function BarSeries({
       </div>
       <div className="mt-2 flex gap-1.5 sm:gap-2">
         {data.map((item) => (
-          <span key={item.label} className="min-w-0 flex-1 truncate text-center text-xs text-ink-faint">
+          <span key={item.label} className="min-w-0 flex-1 truncate text-center text-xs opacity-70">
             {item.label}
           </span>
         ))}

@@ -21,8 +21,12 @@
 
   /* --- Ink -------------------------------------------------------------- */
   --color-ink: #0a0a0a;
-  --color-ink-muted: #63635f; /* 5.9:1 on canvas — safe for body text */
-  --color-ink-faint: #8b8b86; /* >=18px / decorative only */
+  /* Both pass 4.5:1 on canvas, surface and raised. "Faint" was 2.8:1 and
+     documented as decorative, but the app uses it for counts, dates, owners
+     and stage hints at 11–13px — real content, unreadable. Darkened to the
+     job it actually does; muted moved down with it to keep the two apart. */
+  --color-ink-muted: #454540; /* 7.9:1 on canvas */
+  --color-ink-faint: #5f5f59; /* 4.8:1 on the sunk surface, 5.3:1 on canvas */
   --color-on-inverse: #f7f7f5;
   --color-on-inverse-muted: #a3a39d;
 
@@ -48,9 +52,9 @@
   --color-lime-wash: var(--color-accent-wash);
 
   /* --- Semantic status (muted, so lime stays the loudest thing on screen) */
-  --color-positive: #2f7d4f;
+  --color-positive: #276942; /* 5.4:1 on its wash */
   --color-positive-wash: #dceee2;
-  --color-caution: #9a6b12;
+  --color-caution: #7d570e;  /* 5.4:1 on its wash */
   --color-caution-wash: #f5e9cf;
   --color-critical: #a53232;
   --color-critical-wash: #f5dede;
@@ -143,8 +147,8 @@
   --color-inverse-soft: #e2e2df;
 
   --color-ink: #f4f4f1;
-  --color-ink-muted: #a5a5a0; /* 6.6:1 on dark canvas */
-  --color-ink-faint: #77776f;
+  --color-ink-muted: #c2c2bc; /* 10.6:1 on dark canvas */
+  --color-ink-faint: #93938b; /* 6.1:1 on dark canvas */
   --color-on-inverse: #0a0a0a;
   --color-on-inverse-muted: #4a4a46;
 

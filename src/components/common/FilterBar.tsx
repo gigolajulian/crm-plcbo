@@ -199,7 +199,7 @@ export function FilterBar({
                   >
                     {option.label}
                     {option.count !== undefined && (
-                      <span className="tabular text-ink-faint">{option.count}</span>
+                      <span className="tabular opacity-60">{option.count}</span>
                     )}
                   </Chip>
                 ))}

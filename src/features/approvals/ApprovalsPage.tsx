@@ -70,7 +70,7 @@ export default function ApprovalsPage() {
             }
           >
             {filter.label}
-            <span className="tabular text-ink-faint">
+            <span className="tabular opacity-60">
               {all.filter((i) => i.status === filter.id).length}
             </span>
           </Chip>
